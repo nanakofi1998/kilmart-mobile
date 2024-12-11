@@ -4,10 +4,9 @@ import Dropdown from '../Dropdown'
 
 export default function Header() {
   return (
-    <View style={{padding:20, paddingTop:50, backgroundColor:'#101010',borderBottomLeftRadius:10,borderBottomRightRadius:10}}>
-      <View style={{display:'flex',flexDirection:'column', alignItems:'flex-start', gap:10}}>
-        <Text style={{fontFamily:'poppins-bold', fontSize:15, color:'#ffff'}}>DELIVERY ADDRESS</Text>
-        <View>
+    <View style={{padding:20, paddingTop:50, backgroundColor:'#f1b811',borderBottomLeftRadius:10,borderBottomRightRadius:10}}>
+      <View style={{display:'flex',flexDirection:'column', alignItems:'flex-start', gap:10,alignContent:'center'}}>
+        <Text style={{fontFamily:'poppins-bold', fontSize:15, color:'black'}}>DELIVERY ADDRESS</Text>
         <Dropdown
           data={[
             { value: 'accra', label: 'Greater Accra' },
@@ -17,7 +16,6 @@ export default function Header() {
           onChange={console.log}
           placeholder="Fetching Location..."
         />
-        </View>
       </View>
     </View>
   )

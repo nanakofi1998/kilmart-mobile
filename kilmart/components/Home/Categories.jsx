@@ -1,24 +1,24 @@
-import { View, Text,TouchableOpacity, Image, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
 import React from 'react';
 import promotion from '../../assets/images/promo.png';
 import arrival from '../../assets/images/new.png';
-import lebanese from '../../assets/images/lebanon.png'
-import meat from '../../assets/images/meat.png'
-import fruit from '../../assets/images/fruit.png'
-import bakery from '../../assets/images/bake.png'
-import eat from '../../assets/images/ready.png'
-import milk from '../../assets/images/dairy.png'
-import cereal from '../../assets/images/cheerios.png'
-import can from '../../assets/images/jars.png'
-import pantry from '../../assets/images/ketchup.png'
-import snack from '../../assets/images/snacks.png'
-import frozen from '../../assets/images/froze.png'
-import beverages from '../../assets/images/bev.png'
-import alcohol from '../../assets/images/drinks.png'
+import lebanese from '../../assets/images/lebanon.png';
+import meat from '../../assets/images/meat.png';
+import fruit from '../../assets/images/fruit.png';
+import bakery from '../../assets/images/bake.png';
+import eat from '../../assets/images/ready.png';
+import milk from '../../assets/images/dairy.png';
+import cereal from '../../assets/images/cheerios.png';
+import can from '../../assets/images/jars.png';
+import pantry from '../../assets/images/ketchup.png';
+import snack from '../../assets/images/ahoy.png';
+import frozen from '../../assets/images/froze.png';
+import beverages from '../../assets/images/bev.png';
+import alcohol from '../../assets/images/drinks.png';
 
 const categories = [
   { id: '1', name: 'Promotions', image: promotion },
-  { id: '2', name: 'New Arrivals', image:arrival },
+  { id: '2', name: 'New Arrivals', image: arrival },
   { id: '3', name: 'Shop Lebanese', image: lebanese },
   { id: '4', name: 'Meat & Fish', image: meat },
   { id: '5', name: 'Fruits & Veggies', image: fruit },
@@ -33,56 +33,46 @@ const categories = [
   { id: '14', name: 'Beverages', image: beverages },
   { id: '15', name: 'Alcohol', image: alcohol },
 ];
-export default function Categories() {
-  const renderItem = ({ item }) => (
-    <TouchableOpacity style={styles.card}>
-      <Image source={item.image} style={styles.image} />
-      <Text style={styles.text}>{item.name}</Text>
-    </TouchableOpacity>
-  );
 
+const { width } = Dimensions.get('window');
+const itemWidth = (width - 40) / 3; // Adjust the margins and spacing to fit 3 items per row
+
+export default function Categories() {
   return (
-    <FlatList
-      data={categories}
-      renderItem={renderItem}
-      keyExtractor={(item) => item.id}
-      numColumns={3}
-      contentContainerStyle={styles.list}
-      columnWrapperStyle={styles.row}
-      showsVerticalScrollIndicator={true}
-    />
+    <View style={styles.container}>
+      {categories.map((category) => (
+        <TouchableOpacity key={category.id} style={styles.item}>
+          <Image source={category.image} style={styles.image} />
+          <Text style={styles.text}>{category.name}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    padding: 5,
-    paddingBottom: 20,
-    flexGrow: 1, // Ensures content expands for scrolling
-  },
-  row: {
+  container: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    marginTop: 30,
   },
-  card: {
-    flex: 1,
-    margin: 20,
+  item: {
+    width: itemWidth,
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    marginBottom: 20,
   },
   image: {
-    width: 110,
-    height: 80,
-    resizeMode:  'contain'
+    width: itemWidth - 20, // Smaller than the item width for some padding
+    height: itemWidth - 20,
+    objectFit:'contain',
+    marginBottom: 20,
   },
   text: {
-    marginTop: 8,
     fontSize: 14,
-    fontFamily: 'poppins-bold',
+    fontFamily:'poppins',
     textAlign: 'center',
+    color: '#333',
   },
 });
