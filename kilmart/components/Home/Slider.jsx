@@ -8,9 +8,9 @@ import {
   Text
 } from "react-native";
 import React from "react";
-import slider1 from "../../assets/images/image1.jpg";
-import slider2 from "../../assets/images/image2.jpg";
-import slider3 from "../../assets/images/image3.jpg";
+import slider1 from "../../assets/images/black-friday.jpg";
+import slider2 from "../../assets/images/new-year-discount.jpg";
+import slider3 from "../../assets/images/christmas-promo.jpg";
 import slider4 from "../../assets/images/image4.jpg";
 import Animated, {
   useAnimatedScrollHandler,
@@ -107,10 +107,15 @@ const styles = StyleSheet.create({
   slide: {
     alignItems: "center",
     width: width,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowColor: '#000',
+    shadowRadius: 5,
+    elevation: 5, // Shadow effect for Android
   },
   image: {
-    width: 380,
-    height: 140,
+    width: 390,
+    height: 130,
     borderRadius: 20,
   },
   pagination: {

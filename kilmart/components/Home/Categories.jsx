@@ -57,6 +57,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 10,
     marginTop: 30,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowColor: '#000',
+    shadowRadius: 5,
+    elevation: 5, // Shadow effect for Android
   },
   item: {
     width: itemWidth,
