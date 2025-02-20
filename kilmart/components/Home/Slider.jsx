@@ -1,3 +1,4 @@
+import React from "react";
 import {
   View,
   FlatList,
@@ -5,30 +6,37 @@ import {
   Image,
   Dimensions,
   StyleSheet,
-  Text
 } from "react-native";
-import React from "react";
-import slider1 from "../../assets/images/black-friday.jpg";
-import slider2 from "../../assets/images/new-year-discount.jpg";
-import slider3 from "../../assets/images/christmas-promo.jpg";
-import slider4 from "../../assets/images/image4.jpg";
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
   useAnimatedStyle,
   interpolate,
-  Extrapolate,
+  Extrapolation,
 } from "react-native-reanimated";
 
-const slider_item = [
+// Import images
+import slider1 from "../../assets/images/black-friday.jpg";
+import slider2 from "../../assets/images/new-year-discount.jpg";
+import slider3 from "../../assets/images/christmas-promo.jpg";
+import slider4 from "../../assets/images/image4.jpg";
+
+// Constants
+const { width } = Dimensions.get("screen");
+const IMAGE_WIDTH = width - 20; // Adjust for padding/margin
+const IMAGE_HEIGHT = 130;
+const DOT_SIZE = 6;
+const DOT_MARGIN = 4;
+
+// Slider data
+const sliderItems = [
   { id: "1", name: "Strawberry", image: slider1 },
   { id: "2", name: "Fruity", image: slider2 },
   { id: "3", name: "Brodo", image: slider3 },
   { id: "4", name: "Cheetos", image: slider4 },
 ];
-const { width } = Dimensions.get("screen");
 
-export default function Slider() {
+const Slider = () => {
   const scrollX = useSharedValue(0);
 
   const onScrollHandler = useAnimatedScrollHandler({
@@ -38,7 +46,7 @@ export default function Slider() {
   });
 
   // Precompute dot styles for pagination
-  const dotStyles = slider_item.map((_, index) => {
+  const dotStyles = sliderItems.map((_, index) => {
     return useAnimatedStyle(() => {
       const inputRange = [
         (index - 1) * width,
@@ -50,14 +58,14 @@ export default function Slider() {
         scrollX.value,
         inputRange,
         [0.8, 1.4, 0.8],
-        Extrapolate.CLAMP
+        Extrapolation.CLAMP
       );
 
       const opacity = interpolate(
         scrollX.value,
         inputRange,
         [0.5, 1, 0.5],
-        Extrapolate.CLAMP
+        Extrapolation.CLAMP
       );
 
       return {
@@ -67,29 +75,32 @@ export default function Slider() {
     });
   });
 
+  // Render each slide item
+  const renderSlideItem = ({ item }) => (
+    <TouchableOpacity activeOpacity={0.8}>
+      <View style={styles.slide}>
+        <Image source={item.image} style={styles.image} />
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       {/* Slider */}
       <Animated.FlatList
-        data={slider_item}
+        data={sliderItems}
         horizontal={true}
         showsHorizontalScrollIndicator={false}
         pagingEnabled
         onScroll={onScrollHandler}
         scrollEventThrottle={16}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity activeOpacity={0.8}>
-            <View style={styles.slide}>
-              <Image source={item.image} style={styles.image} />
-            </View>
-          </TouchableOpacity>
-        )}
+        renderItem={renderSlideItem}
       />
 
       {/* Pagination Dots */}
       <View style={styles.pagination}>
-        {slider_item.map((_, index) => (
+        {sliderItems.map((_, index) => (
           <Animated.View
             key={index}
             style={[styles.dot, dotStyles[index]]}
@@ -98,7 +109,7 @@ export default function Slider() {
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -114,9 +125,10 @@ const styles = StyleSheet.create({
     elevation: 5, // Shadow effect for Android
   },
   image: {
-    width: 390,
-    height: 130,
+    width: IMAGE_WIDTH,
+    height: IMAGE_HEIGHT,
     borderRadius: 20,
+    marginHorizontal: 10, // Add some margin for better spacing
   },
   pagination: {
     flexDirection: "row",
@@ -124,10 +136,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 4,
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
     backgroundColor: '#f1b811',
-    marginHorizontal: 4,
+    marginHorizontal: DOT_MARGIN,
   },
 });
+
+export default React.memo(Slider);
