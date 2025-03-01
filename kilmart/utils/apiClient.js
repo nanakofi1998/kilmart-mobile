@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const apiClient = axios.create({
     baseURL: 'https://supermart-q7ed.onrender.com/api/', 
-    timeout: 5000,
+    timeout: 10000,
     headers: { 'Content-Type': 'application/json' }
 });
 

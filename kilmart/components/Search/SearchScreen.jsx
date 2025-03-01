@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
      shadowOpacity: 0.8,
      shadowRadius: 5,
      // Shadow for Android
-     elevation: 8,
+     elevation: 10,
   },
   icon: {
     marginBottom: 20,

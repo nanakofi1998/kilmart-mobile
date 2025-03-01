@@ -4,9 +4,9 @@ import "../global.css"
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    'poppins-bold': require('./../assets/fonts/Poppins-Bold.ttf'),
-    'poppins': require('./../assets/fonts/Poppins-Medium.ttf'),
-    'poppins-semi': require('./../assets/fonts/Poppins-SemiBold.ttf'),
+    'inter-bold': require('./../assets/fonts/Inter_18pt-Bold.ttf'),
+    'inter': require('./../assets/fonts/Inter_18pt-Regular.ttf'),
+    'inter-semi': require('./../assets/fonts/Inter_18pt-SemiBold.ttf'),
   });
 
   if (!fontsLoaded) {
