@@ -4,7 +4,7 @@
     "slug": "kilmart",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/kwikmart.jpg",
+    "icon": "./assets/images/kwikmart.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,21 +13,22 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/kwikmart.jpg",
+        "foregroundImage": "./assets/images/kwikmart.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.kevinlauren1998.kilmart"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/ahoy.png"
+      "favicon": "./assets/images/kwikmart.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/kwikmart.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -36,6 +37,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9f7c3a78-1675-4f17-b4d0-345dbd1fd4c4"
+      }
     }
   }
 }
