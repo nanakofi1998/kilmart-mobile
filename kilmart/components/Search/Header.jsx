@@ -21,7 +21,7 @@ export default function Header() {
 const styles = StyleSheet.create({
   headerContainer: {
     padding: 20,
-    paddingTop: 50,
+    paddingTop: 60,
     backgroundColor: '#f1b811',
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
     elevation: 5, // Shadow effect for Android
   },
   headerTitle: {
-    fontFamily: 'poppins-bold',
+    fontFamily: 'inter-bold',
     fontSize: 15,
     color: 'black',
     marginBottom: 10,

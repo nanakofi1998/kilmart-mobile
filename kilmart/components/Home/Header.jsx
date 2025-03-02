@@ -4,9 +4,9 @@ import Dropdown from '../Dropdown'
 
 export default function Header() {
   return (
-    <View style={{padding:20, paddingTop:50, backgroundColor:'#f1b811',borderBottomLeftRadius:10,borderBottomRightRadius:10, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowColor: '#000', shadowRadius: 5, elevation: 5,}}>
+    <View style={{padding:20, paddingTop:60, backgroundColor:'#f1b811',borderBottomLeftRadius:10,borderBottomRightRadius:10, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowColor: '#000', shadowRadius: 5, elevation: 5,}}>
       <View style={{display:'flex',flexDirection:'column', alignItems:'flex-start', gap:10,alignContent:'center'}}>
-        <Text style={{fontFamily:'poppins-bold', fontSize:15, color:'black'}}>DELIVERY ADDRESS</Text>
+        <Text style={{fontFamily:'inter-bold', fontSize:15, color:'black'}}>DELIVERY ADDRESS</Text>
         <Dropdown
           data={[
             { value: 'accra', label: 'Greater Accra' },

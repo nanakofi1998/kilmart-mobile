@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   text: {
-    fontFamily: 'poppins',
+    fontFamily: 'inter',
     fontSize: 18,
     color: 'grey',
   },

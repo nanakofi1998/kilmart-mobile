@@ -2,7 +2,7 @@ import { View, Text, ScrollView } from 'react-native'
 import React from 'react'
 import Header from '../../components/Home/Header'
 import Slider from '../../components/Home/Slider'
-import Categories from '../../components/Home/Categories'
+//import Categories from '../../components/Home/Categories'
 import Cat from '../../components/Home/Cat'
 
 export default function Home() {

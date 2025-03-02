@@ -4,7 +4,7 @@
     "slug": "kilmart",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/ahoy.png",
+    "icon": "./assets/images/kwikmart.jpg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/ahoy.png",
+        "foregroundImage": "./assets/images/kwikmart.jpg",
         "backgroundColor": "#ffffff"
       }
     },

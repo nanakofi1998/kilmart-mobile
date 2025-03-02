@@ -1,6 +1,8 @@
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
-import { Link } from 'expo-router';
+import { Link } from 'expo-router'; // Import Link from Expo Router
 import React from 'react';
+
+// Import images
 import promotion from '../../assets/images/promo.png';
 import arrival from '../../assets/images/new.png';
 import lebanese from '../../assets/images/lebanon.png';
@@ -17,7 +19,7 @@ import frozen from '../../assets/images/froze.png';
 import beverages from '../../assets/images/bev.png';
 import alcohol from '../../assets/images/drinks.png';
 
-const categories = [
+const category = [
   { id: '1', name: 'Promotions', image: promotion },
   { id: '2', name: 'New Arrivals', image: arrival },
   { id: '3', name: 'Shop Lebanese', image: lebanese },
@@ -41,12 +43,19 @@ const itemWidth = (width - 40) / 3; // Adjust the margins and spacing to fit 3 i
 export default function Cat() {
   return (
     <View style={styles.container}>
-      {categories.map((category) => (
-        <Link key={category.id} href={{ pathname: `/category/${category.id}`, params: { categoryName: category.name}}} asChild>
-        <TouchableOpacity key={category.id} style={styles.item}>
-          <Image source={category.image} style={styles.image} />
-          <Text style={styles.text}>{category.name}</Text>
-        </TouchableOpacity>
+      {category.map((category) => (
+        <Link
+          key={category.id}
+          href={{
+            pathname: `/category/${category.id}`,
+            params: { categoryName: category.name },
+          }}
+          asChild
+        >
+          <TouchableOpacity style={styles.item}>
+            <Image source={category.image} style={styles.image} />
+            <Text style={styles.text}>{category.name}</Text>
+          </TouchableOpacity>
         </Link>
       ))}
     </View>
@@ -60,11 +69,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 10,
     marginTop: 30,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowColor: '#000',
-    shadowRadius: 5,
-    elevation: 5,
   },
   item: {
     width: itemWidth,
@@ -74,7 +78,7 @@ const styles = StyleSheet.create({
   image: {
     width: itemWidth - 20,
     height: itemWidth - 20,
-    resizeMode: 'contain', 
+    resizeMode: 'contain',
     marginBottom: 10,
   },
   text: {

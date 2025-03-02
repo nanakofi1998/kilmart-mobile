@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   FlatList,
@@ -6,14 +6,8 @@ import {
   Image,
   Dimensions,
   StyleSheet,
+  Animated,
 } from "react-native";
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-  useAnimatedStyle,
-  interpolate,
-  Extrapolation,
-} from "react-native-reanimated";
 
 // Import images
 import slider1 from "../../assets/images/black-friday.jpg";
@@ -37,43 +31,7 @@ const sliderItems = [
 ];
 
 const Slider = () => {
-  const scrollX = useSharedValue(0);
-
-  const onScrollHandler = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      scrollX.value = e.contentOffset.x;
-    },
-  });
-
-  // Precompute dot styles for pagination
-  const dotStyles = sliderItems.map((_, index) => {
-    return useAnimatedStyle(() => {
-      const inputRange = [
-        (index - 1) * width,
-        index * width,
-        (index + 1) * width,
-      ];
-
-      const scale = interpolate(
-        scrollX.value,
-        inputRange,
-        [0.8, 1.4, 0.8],
-        Extrapolation.CLAMP
-      );
-
-      const opacity = interpolate(
-        scrollX.value,
-        inputRange,
-        [0.5, 1, 0.5],
-        Extrapolation.CLAMP
-      );
-
-      return {
-        transform: [{ scale }],
-        opacity,
-      };
-    });
-  });
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   // Render each slide item
   const renderSlideItem = ({ item }) => (
@@ -84,6 +42,42 @@ const Slider = () => {
     </TouchableOpacity>
   );
 
+  // Render pagination dots
+  const renderPagination = () => {
+    const dotPosition = Animated.divide(scrollX, width);
+
+    return (
+      <View style={styles.pagination}>
+        {sliderItems.map((_, index) => {
+          const opacity = dotPosition.interpolate({
+            inputRange: [index - 1, index, index + 1],
+            outputRange: [0.5, 1, 0.5],
+            extrapolate: "clamp",
+          });
+
+          const scale = dotPosition.interpolate({
+            inputRange: [index - 1, index, index + 1],
+            outputRange: [0.8, 1.4, 0.8],
+            extrapolate: "clamp",
+          });
+
+          return (
+            <Animated.View
+              key={index}
+              style={[
+                styles.dot,
+                {
+                  opacity,
+                  transform: [{ scale }],
+                },
+              ]}
+            />
+          );
+        })}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Slider */}
@@ -92,21 +86,17 @@ const Slider = () => {
         horizontal={true}
         showsHorizontalScrollIndicator={false}
         pagingEnabled
-        onScroll={onScrollHandler}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: false }
+        )}
         scrollEventThrottle={16}
         keyExtractor={(item) => item.id}
         renderItem={renderSlideItem}
       />
 
       {/* Pagination Dots */}
-      <View style={styles.pagination}>
-        {sliderItems.map((_, index) => (
-          <Animated.View
-            key={index}
-            style={[styles.dot, dotStyles[index]]}
-          />
-        ))}
-      </View>
+      {renderPagination()}
     </View>
   );
 };

@@ -41,7 +41,7 @@ export default function Header() {
         </TouchableOpacity>
 
         {/* Title */}
-        <Text style={{ fontFamily: 'poppins-bold', fontSize: 18, color: 'black' }}>
+        <Text style={{ fontFamily: 'inter-bold', fontSize: 18, color: 'black' }}>
           Cart
         </Text>
 
