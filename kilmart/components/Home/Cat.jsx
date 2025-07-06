@@ -1,49 +1,53 @@
-import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
-import { Link } from 'expo-router'; // Import Link from Expo Router
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { Link } from 'expo-router';
+import apiClient from '../../utils/apiClient';
 
-// Import images
-import promotion from '../../assets/images/promo.png';
-import arrival from '../../assets/images/new.png';
-import lebanese from '../../assets/images/lebanon.png';
-import meat from '../../assets/images/meat.png';
-import fruit from '../../assets/images/fruit.png';
-import bakery from '../../assets/images/bake.png';
-import eat from '../../assets/images/ready.png';
-import milk from '../../assets/images/dairy.png';
-import cereal from '../../assets/images/cheerios.png';
-import can from '../../assets/images/jars.png';
-import pantry from '../../assets/images/ketchup.png';
-import snack from '../../assets/images/ahoy.png';
-import frozen from '../../assets/images/froze.png';
-import beverages from '../../assets/images/bev.png';
-import alcohol from '../../assets/images/drinks.png';
-
-const category = [
-  { id: '1', name: 'Promotions', image: promotion },
-  { id: '2', name: 'New Arrivals', image: arrival },
-  { id: '3', name: 'Shop Lebanese', image: lebanese },
-  { id: '4', name: 'Meat & Fish', image: meat },
-  { id: '5', name: 'Fruits & Veggies', image: fruit },
-  { id: '6', name: 'Bakery', image: bakery },
-  { id: '7', name: 'Ready to Eat', image: eat },
-  { id: '8', name: 'Dairy & Egg', image: milk },
-  { id: '9', name: 'Cereal & Packs', image: cereal },
-  { id: '10', name: 'Cans & Jars', image: can },
-  { id: '11', name: 'Pantry', image: pantry },
-  { id: '12', name: 'Frozen', image: frozen },
-  { id: '13', name: 'Beverages', image: beverages },
-  { id: '14', name: 'Snacks', image: snack },
-  { id: '15', name: 'Alcohol', image: alcohol },
-];
 
 const { width } = Dimensions.get('window');
-const itemWidth = (width - 40) / 3; // Adjust the margins and spacing to fit 3 items per row
+const itemWidth = (width - 40) / 3;
 
 export default function Cat() {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch categories from API
+  const fetchCategories = async () => {
+    try {
+      const response = await apiClient.get('categories/');
+      setCategories(response.data);
+      setLoading(false);
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+      setError('Could not load categories.');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#333" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {category.map((category) => (
+      {categories.map((category) => (
         <Link
           key={category.id}
           href={{
@@ -53,7 +57,7 @@ export default function Cat() {
           asChild
         >
           <TouchableOpacity style={styles.item}>
-            <Image source={category.image} style={styles.image} />
+            <Image source={{ uri: category.category_image }} style={styles.image} />
             <Text style={styles.text}>{category.name}</Text>
           </TouchableOpacity>
         </Link>
@@ -80,11 +84,25 @@ const styles = StyleSheet.create({
     height: itemWidth - 20,
     resizeMode: 'contain',
     marginBottom: 10,
+    borderRadius: 10,
+    backgroundColor: '#f2f2f2',
   },
   text: {
     fontSize: 13,
     fontFamily: 'poppins',
     textAlign: 'center',
     color: '#333',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 60,
+  },
+  errorText: {
+    color: 'tomato',
+    fontSize: 18,
+    fontFamily: 'poppins',
+    fontWeight: 'bold',
   },
 });
