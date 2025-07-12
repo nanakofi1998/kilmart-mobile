@@ -58,7 +58,6 @@ export default function LoginScreen() {
       const response = await apiClient.post('/auth/jwt/create/', credentials);
       // console.log(credentials)
       // console.log('Fetched token from SecureStore:', access);
-      await SecureStore.setItemAsync('access', response.data.access);
       const { access, full_name } = response.data;
 
       await SecureStore.setItemAsync('access', access);

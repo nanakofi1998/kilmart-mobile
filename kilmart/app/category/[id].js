@@ -1,166 +1,292 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ScrollView, Modal, TextInput, ActivityIndicator
+  View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ScrollView,
+  Modal, TextInput, ActivityIndicator, Dimensions, Alert
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
 import apiClient from '../../utils/apiClient';
+import { useCart } from '../../context/CartContext'
+
+const { width } = Dimensions.get('window');
+const numColumns = 3;
 
 export default function CategoryScreen() {
-  const { id, categoryName } = useLocalSearchParams();
-  const [categories, setCategories] = useState([]);
-  const [items, setItems] = useState([]);
-  const [selectedTab, setSelectedTab] = useState(id);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingItems, setLoadingItems] = useState(true);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [cart, setCart] = useState([]);
+  const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { addToCart } = useCart();
 
-  const numColumns = 3;
+  const [state, setState] = useState({
+    categories: [],
+    subCategories: [],
+    items: [],
+    selectedMainTab: id,
+    selectedSubTab: null,
+    selectedItem: null,
+    quantity: 1,
+    isModalVisible: false,
+    loading: {
+      categories: true,
+      subCategories: true,
+      items: true
+    }
+  });
 
-  const scrollViewRef = useRef(null);
+  const mainScrollViewRef = useRef(null);
+  const subScrollViewRef = useRef(null);
   const tabRefs = useRef({});
 
-  const fetchCategories = async () => {
+  const fetchData = useCallback(async (url, stateKey, loadingKey) => {
     try {
-      const response = await apiClient.get('categories/');
-      setCategories(response.data);
-      setLoadingCategories(false);
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-      setLoadingCategories(false);
-    }
-  };
+      const response = await apiClient.get(url);
+      let data = response.data;
 
-  const fetchItems = async (categoryId) => {
-    setLoadingItems(true);
-    try {
-      const response = await apiClient.get(`categories/${categoryId}/`);
-      setItems(response.data);
-    } catch (error) {
-      console.error(`Failed to fetch items for category ${categoryId}:`, error);
-      setItems([]);
-    } finally {
-      setLoadingItems(false);
-    }
-  };
+      // 🔥 Sanitize prices if fetching products
+      if (stateKey === 'items') {
+        data = data.map(item => {
+          let cleanPrice = Number(item.price);
+          if (isNaN(cleanPrice) || cleanPrice === null || cleanPrice === undefined) {
+            console.warn(`⚠️ Product "${item.name}" has invalid price value:`, item.price);
+            cleanPrice = 0;
+          }
+          return {
+            ...item,
+            price: cleanPrice
+          };
+        });
+      }
 
-  useEffect(() => {
-    fetchCategories();
+      setState(prev => ({
+        ...prev,
+        [stateKey]: data,
+        loading: { ...prev.loading, [loadingKey]: false }
+      }));
+      return data;
+    } catch (error) {
+      console.error(`Failed to fetch ${stateKey}:`, error);
+      setState(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [loadingKey]: false }
+      }));
+      return [];
+    }
   }, []);
 
-  useEffect(() => {
-    if (selectedTab) {
-      fetchItems(selectedTab);
-      scrollToActiveTab(selectedTab);
+  const scrollToTab = useCallback((tabId, scrollViewRef, offset = -10) => {
+    const tabRef = tabRefs.current[tabId];
+    if (tabRef && scrollViewRef.current) {
+      tabRef.measureLayout(
+        scrollViewRef.current,
+        (x) => scrollViewRef.current?.scrollTo({ x: x + offset, animated: true }),
+        () => { }
+      );
     }
-  }, [selectedTab, categories]);
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    const initialize = async () => {
+      const cats = await fetchData('categories/', 'categories', 'categories');
+      if (state.selectedMainTab) {
+        await handleMainTabChange(state.selectedMainTab);
+      } else if (cats.length > 0) {
+        handleMainTabChange(cats[0].id);
+      }
+    };
+    initialize();
+  }, []));
+
+  const handleMainTabChange = useCallback(async (categoryId) => {
+    setState(prev => ({
+      ...prev,
+      selectedMainTab: categoryId,
+      loading: { ...prev.loading, subCategories: true, items: true }
+    }));
+
+    const subs = await fetchData(`categories/${categoryId}/subcategories/`, 'subCategories', 'subCategories');
+
+    if (subs.length > 0) {
+      handleSubTabChange(subs[0].id);
+    }
+
+    scrollToTab(categoryId, mainScrollViewRef);
+  }, [fetchData, scrollToTab]);
+
+  const handleSubTabChange = useCallback(async (subCategoryId) => {
+    setState(prev => ({
+      ...prev,
+      selectedSubTab: subCategoryId,
+      loading: { ...prev.loading, items: true }
+    }));
+
+    await fetchData(`subcategories/${subCategoryId}/products/`, 'items', 'items');
+
+    scrollToTab(subCategoryId, subScrollViewRef);
+  }, [fetchData, scrollToTab]);
 
   const handleAddToCart = (item) => {
-    setSelectedItem(item);
-    setIsModalVisible(true);
+    setState(prev => ({
+      ...prev,
+      selectedItem: item,
+      quantity: 1,
+      isModalVisible: true
+    }));
   };
 
-  const handleIncreaseQuantity = () => setQuantity((prev) => prev + 1);
-  const handleDecreaseQuantity = () => quantity > 1 && setQuantity((prev) => prev - 1);
+  const handleQuantityChange = (amount) => {
+    const { quantity, selectedItem } = state;
+    const maxQty = selectedItem?.stock || 0;
+    const newQty = Math.max(1, Math.min(quantity + amount, maxQty));
 
-  const handleModalAddToCart = () => {
-    const itemToAdd = { ...selectedItem, quantity };
-    setCart((prevCart) => [...prevCart, itemToAdd]);
-    setIsModalVisible(false);
-    setQuantity(1);
-    router.push('/cart');
+    setState(prev => ({
+      ...prev,
+      quantity: newQty
+    }));
   };
 
-  const scrollToActiveTab = (categoryId) => {
-    const ref = tabRefs.current[categoryId];
-    if (ref && scrollViewRef.current) {
-      ref.measureLayout(scrollViewRef.current, (x) => {
-        scrollViewRef.current.scrollTo({ x: x - 10, animated: true });
-      });
+  const handleModalAddToCart = async () => {
+    if (!state.selectedItem) {
+      Alert.alert('Error', 'No item selected');
+      return;
+    }
+
+    try {
+      if (state.selectedItem.stock === 0) {
+        Alert.alert('Unavailable', 'This product is out of stock.');
+        return;
+      }
+
+      if (state.quantity > state.selectedItem.stock) {
+        Alert.alert('Out of Stock', `Only ${state.selectedItem.stock} available`);
+        return;
+      }
+
+      await addToCart(state.selectedItem, state.quantity);
+
+      Alert.alert(
+        'Added to Cart',
+        `${state.selectedItem.name} (${state.quantity}) added to your cart`,
+        [
+          { text: 'View Cart', onPress: () => router.push('/cart') },
+          { text: 'Continue Shopping', style: 'cancel' }
+        ]
+      );
+
+      setState(prev => ({
+        ...prev,
+        isModalVisible: false,
+        quantity: 1
+      }));
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add item to cart');
+      console.error('Add to cart error:', error);
     }
   };
+
+  const renderTab = (item, isMainTab = true) => (
+    <TouchableOpacity
+      key={item.id}
+      ref={el => tabRefs.current[item.id] = el}
+      style={[
+        isMainTab ? styles.mainTab : styles.subTab,
+        (isMainTab ? state.selectedMainTab : state.selectedSubTab) == item.id &&
+        (isMainTab ? styles.activeMainTab : styles.activeSubTab)
+      ]}
+      onPress={() => isMainTab ? handleMainTabChange(item.id) : handleSubTabChange(item.id)}
+    >
+      <Text style={[
+        isMainTab ? styles.mainTabText : styles.subTabText,
+        (isMainTab ? state.selectedMainTab : state.selectedSubTab) == item.id &&
+        (isMainTab ? styles.activeMainTabText : styles.activeSubTabText)
+      ]}>
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderProductItem = ({ item }) => (
+    <View style={styles.item}>
+      <Image source={{ uri: item.product_image }} style={styles.itemImage} />
+      <Text style={styles.itemName}>{item.name}</Text>
+      <Text style={styles.itemDescription}>{item.description}</Text>
+      <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => handleAddToCart(item)}
+        disabled={item.stock === 0}
+      >
+        <Text style={styles.addButtonText}>
+          {item.stock === 0 ? 'Out of Stock' : 'ADD'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.heroText}>Category: {categoryName}</Text>
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        <ScrollView horizontal ref={mainScrollViewRef} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mainTabBarContainer}>
+          {state.categories.map(category => renderTab(category))}
+        </ScrollView>
+
+        <ScrollView horizontal ref={subScrollViewRef} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subTabBarContainer}>
+          {state.subCategories.map(subCategory => renderTab(subCategory, false))}
+        </ScrollView>
       </View>
 
-      {loadingCategories ? (
-        <ActivityIndicator size="large" color="#333" style={{ marginTop: 30 }} />
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabBarContainer}
-          ref={scrollViewRef}
-        >
-          {categories.map((category) => (
-            <TouchableOpacity
-              key={category.id}
-              style={[styles.tab, selectedTab == category.id && styles.activeTab]}
-              onPress={() => setSelectedTab(category.id)}
-              ref={(el) => (tabRefs.current[category.id] = el)}
-            >
-              <Text style={[styles.tabText, selectedTab == category.id && styles.activeTabText]}>
-                {category.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      {loadingItems ? (
-        <ActivityIndicator size="large" color="#333" style={{ marginTop: 30 }} />
+      {/* Products */}
+      {state.loading.items ? (
+        <ActivityIndicator size="large" color="#333" style={{ marginTop: 20 }} />
       ) : (
         <FlatList
-          data={items}
-          keyExtractor={(item) => item.id.toString()}
+          data={state.items}
+          renderItem={renderProductItem}
+          keyExtractor={item => item.id.toString()}
           numColumns={numColumns}
-          contentContainerStyle={styles.itemsContainer}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Image source={{ uri: item.image }} style={styles.itemImage} />
-              <Text style={styles.itemText}>{item.name}</Text>
-              <Text style={{ fontFamily: 'inter-bold', marginTop: 5, fontSize: 14 }}>{item.price}</Text>
-              <TouchableOpacity style={styles.addToCartButton} onPress={() => handleAddToCart(item)}>
-                <Text style={styles.addToCartButtonText}>Add to Cart</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          contentContainerStyle={{ paddingBottom: 50 }}
         />
       )}
 
+      {/* Product Modal */}
       <Modal
-        visible={isModalVisible}
+        visible={state.isModalVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setIsModalVisible(false)}
+        onRequestClose={() => setState(prev => ({ ...prev, isModalVisible: false }))}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsModalVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setState(prev => ({ ...prev, isModalVisible: false }))}>
           <View style={styles.modalContent}>
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <Image source={{ uri: selectedItem?.image }} style={styles.modalImage} />
-              <Text style={{ fontFamily: 'inter-bold', fontSize: 16 }}>{selectedItem?.name}</Text>
-              <Text style={{ fontFamily: 'inter-bold', fontSize: 20 }}>{selectedItem?.price}</Text>
-            </View>
+            <Image source={{ uri: state.selectedItem?.product_image }} style={styles.modalImage} />
+            <Text style={styles.modalItemName}>{state.selectedItem?.name}</Text>
+            <Text style={styles.modalItemStock}>available: {state.selectedItem?.stock}</Text>
+            <Text style={styles.modalItemPrice}>GH₵{state.selectedItem?.price}</Text>
 
             <View style={styles.quantityContainer}>
-              <TouchableOpacity style={styles.quantityButton} onPress={handleDecreaseQuantity}>
+              <TouchableOpacity
+                style={[styles.quantityButton, { opacity: state.quantity <= 1 ? 0.4 : 1 }]}
+                onPress={() => handleQuantityChange(-1)}
+                disabled={state.quantity <= 1}
+              >
                 <AntDesign name="minus" size={20} color="#fff" />
               </TouchableOpacity>
-              <TextInput style={styles.quantityInput} value={quantity.toString()} editable={false} />
-              <TouchableOpacity style={styles.quantityButton} onPress={handleIncreaseQuantity}>
+
+              <TextInput
+                style={styles.quantityInput}
+                value={state.quantity.toString()}
+                editable={false}
+              />
+
+              <TouchableOpacity
+                style={[styles.quantityButton, { opacity: state.quantity >= (state.selectedItem?.stock || 0) ? 0.4 : 1 }]}
+                onPress={() => handleQuantityChange(1)}
+                disabled={state.quantity >= (state.selectedItem?.stock || 0)}
+              >
                 <AntDesign name="plus" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.modalAddToCartButton} onPress={handleModalAddToCart}>
-              <Text style={styles.modalAddToCartButtonText}>Add to Cart</Text>
+            <TouchableOpacity style={styles.modalAddButton} onPress={handleModalAddToCart}>
+              <Text style={styles.modalAddButtonText}>ADD TO CART</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -169,71 +295,104 @@ export default function CategoryScreen() {
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: 60,
-    padding: 20,
-    backgroundColor: '#f1b811',
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    marginBottom: 5,
+  tabContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e0e0e0',
   },
-  heroText: {
-    fontSize: 20,
-    fontFamily: 'inter-bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  tabBarContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  tab: {
-    paddingHorizontal: 15,
+  mainTabBarContainer: {
+    paddingLeft: 12,
     paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
   },
-  activeTab: {
-    backgroundColor: '#f1b811',
+  mainTab: {
+    marginRight: 24,
+    paddingVertical: 6,
   },
-  tabText: {
-    fontSize: 15,
-    color: '#0d0d0e',
+  mainTabText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+    textTransform: 'uppercase',
   },
-  activeTabText: {
-    color: '#fff',
+  activeMainTabText: {
+    color: '#f1b811',
     fontWeight: 'bold',
+    fontFamily: 'inter-bold'
+  },
+  subTabBarContainer: {
+    paddingLeft: 12,
+    paddingVertical: 8,
+    paddingBottom: 12,
+  },
+  subTabScrollView: {
+    marginTop: -4, // Bring subcategories closer to main tabs
+  },
+  subTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  activeSubTab: {
+    backgroundColor: '#000',
+  },
+  subTabText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  activeSubTabText: {
+    color: '#fff',
+    fontFamily: 'inter',
   },
   itemsContainer: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   item: {
     width: '32%',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
+    marginRight: '1%',
+    padding: 8,
   },
   itemImage: {
     width: 100,
     height: 100,
     resizeMode: 'contain',
+    borderRadius: 10,
+    marginBottom: 5,
   },
-  itemText: {
+  itemName: {
     fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '400',
+  },
+  itemDescription: {
+    fontSize: 10,
+    textAlign: 'center',
+    fontFamily: 'inter',
+  },
+  itemPrice: {
+    fontWeight: 'bold',
     marginTop: 5,
+    fontSize: 14,
   },
-  addToCartButton: {
-    marginTop: 10,
+  addButton: {
+    marginTop: 8,
     padding: 8,
-    backgroundColor: 'black',
-    borderRadius: 20,
+    backgroundColor: '#000',
+    borderRadius: 50,
+    width: '100%',
+    alignItems: 'center',
   },
-  addToCartButtonText: {
-    fontSize: 13,
+  addButtonText: {
+    fontSize: 12,
     color: '#fff',
-    fontFamily: 'inter-bold',
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
@@ -254,13 +413,31 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 10,
   },
+  modalItemName: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  modalItemStock: {
+    fontWeight: '300',
+    fontSize: 14,
+    textAlign: 'center',
+    color: 'red',
+    marginTop: 5,
+  },
+  modalItemPrice: {
+    fontWeight: 'bold',
+    fontSize: 20,
+    marginTop: 5,
+    textAlign: 'center'
+  },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
   },
   quantityButton: {
-    padding: 3,
+    padding: 10,
     backgroundColor: 'black',
     borderRadius: 20,
   },
@@ -270,17 +447,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginHorizontal: 10,
   },
-  modalAddToCartButton: {
+  modalAddButton: {
     padding: 15,
     backgroundColor: 'black',
-    borderRadius: 10,
+    borderRadius: 50,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
-  modalAddToCartButtonText: {
+  modalAddButtonText: {
     fontSize: 16,
     color: '#fff',
-    fontFamily: 'inter-bold',
+    fontWeight: 'bold',
+  },
+  loader: {
+    marginTop: 30,
+  },
+  subLoader: {
+    marginVertical: 10,
   },
 });

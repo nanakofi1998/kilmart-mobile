@@ -1,5 +1,6 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
+import { CartProvider } from "../context/CartContext";
 import "../global.css"
 
 export default function RootLayout() {
@@ -10,12 +11,14 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return null; 
+    return null;
   }
-  
+
   return (
-  <Stack screenOptions={{ headerShown:false}}>
-    <Stack.Screen name="(tabs)"></Stack.Screen>
-  </Stack>
+    <CartProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)"></Stack.Screen>
+      </Stack>
+    </CartProvider>
   )
 }

@@ -1,151 +1,225 @@
-{/*import { View, Text, ScrollView } from 'react-native'
-import React from 'react'
-import Header from '../../components/Cart/Header'
-import EmptyCart from '../../components/Cart/EmptyCart'
-import AddedCart from '../../components/Cart/AddedCart'
-
-export default function Cart() {
-  return (
-    <View style={{flex:1}}>*/}
-      {/**Header 
-      <Header/>
-      <ScrollView style={{flexGrow:1, paddingBottom:10}}>*/}
-      {/**Empty Cart 
-      <EmptyCart/>*/}
-
-      {/**item Added To Cart Screen 
-      <AddedCart/>
-      </ScrollView>
-    </View>
-  )
-}*/}
-
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
-import Header from '../../components/Cart/Header'; // Assuming you have a Header component
-import { router } from 'expo-router';
-
-// Dummy cart data
-const dummyCart = [
-  {
-    id: '1',
-    name: 'Basmati Rice',
-    image: require('../../assets/images/basmati.png'), // Update the path to your image
-    price: 'GH₵ 500.00',
-    quantity: 2,
-  },
-  {
-    id: '2',
-    name: 'Doughnut',
-    image: require('../../assets/images/doughnut.png'), // Update the path to your image
-    price: 'GH₵ 120.00',
-    quantity: 1,
-  },
-  {
-    id: '3',
-    name: 'Chips Ahoy',
-    image: require('../../assets/images/ahoy.png'), // Update the path to your image
-    price: 'GH₵ 68.00',
-    quantity: 3,
-  },
-];
+import { 
+  View, Text, StyleSheet, FlatList, Image, 
+  TouchableOpacity, Alert 
+} from 'react-native';
+import Octicons from '@expo/vector-icons/Octicons';
+import { useRouter } from 'expo-router';
+import { useCart } from '../../context/CartContext';
+import EmptyCart from '../../components/Cart/EmptyCart';
+import Header from '../../components/Cart/Header';
 
 export default function Cart() {
-  // Calculate the total price
-  const totalPrice = dummyCart.reduce(
-    (sum, item) => sum + parseFloat(item.price.replace('GH₵ ', '')) * item.quantity,
-    0
-  );
+  const {
+    cartItems,
+    removeFromCart,
+    updateItemQuantity,
+    clearCart,
+    totalItems,
+    totalPrice
+  } = useCart();
+  const router = useRouter();
+
+  const handleQuantityChange = (item, newQuantity) => {
+    if (newQuantity < 1) return;
+
+    if (newQuantity > item.stock) {
+      Alert.alert('Stock Limit', `Only ${item.stock} items available.`);
+      return;
+    }
+
+    updateItemQuantity(item.id, newQuantity);
+  };
+
+  const handleCheckout = () => {
+    router.push('/checkout');
+  };
 
   return (
     <View style={styles.container}>
-      <Header />
-      {/* Display Cart Items */}
-      <FlatList
-        style={{ marginTop: 20}}
-        data={dummyCart}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.cartItem}>
-            <Image source={item.image} style={styles.cartItemImage} />
-            <View style={styles.cartItemDetails}>
-              <Text style={styles.cartItemName}>{item.name}</Text>
-              <Text style={styles.cartItemPrice}>
-                {item.price} x {item.quantity}
-              </Text>
+      {cartItems.length === 0 ? (
+        <View style={styles.emptyCart}>
+          <EmptyCart />
+          <TouchableOpacity
+            style={styles.continueShopping}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.continueShoppingText}>Continue Shopping</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          <Header />
+
+          <FlatList
+            data={cartItems}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.cartItem}>
+                <Image source={{ uri: item.product_image }} style={styles.itemImage} />
+                <View style={styles.itemDetails}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
+
+                  <View style={styles.quantityContainer}>
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => handleQuantityChange(item, item.quantity - 1)}
+                    >
+                      <Text style={styles.quantityButtonText}>-</Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.quantityText}>{item.quantity}</Text>
+
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => handleQuantityChange(item, item.quantity + 1)}
+                    >
+                      <Text style={styles.quantityButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeFromCart(item.id)}
+                >
+                  <Octicons name="trash" size={20} color="#ff4444" />
+                </TouchableOpacity>
+              </View>
+            )}
+            contentContainerStyle={styles.listContent}
+          />
+
+          <View style={styles.footer}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalText}>Total: GH₵{totalPrice.toFixed(2)}</Text>
             </View>
+
+            <TouchableOpacity
+              style={styles.checkoutButton}
+              onPress={handleCheckout}
+            >
+              <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      />
-
-      {/* Total Price */}
-      <View style={styles.totalContainer}>
-        <Text style={styles.totalText}>Total: GH₵{totalPrice.toFixed(2)}</Text>
-      </View>
-
-      {/* Checkout Button */}
-      <TouchableOpacity style={styles.checkoutButton} onPress={()=>{router.push('/checkout')}}>
-        <Text style={styles.checkoutButtonText}>Checkout</Text>
-      </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
 
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  emptyCart: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    marginBottom: 20,
+  },
+  continueShopping: {
+    backgroundColor: '#000',
+    padding: 15,
+    borderRadius: 50,
+    marginTop: 15,
+  },
+  continueShoppingText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   cartItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
     padding: 10,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    marginTop:20,
   },
-  cartItemImage: {
+  itemImage: {
     width: 80,
     height: 80,
-    resizeMode: 'contain',
-    marginRight: 10,
+    borderRadius: 8,
+    marginRight: 15,
   },
-  cartItemDetails: {
+  itemDetails: {
     flex: 1,
   },
-  cartItemName: {
-    fontSize: 18,
-    fontFamily: 'inter-bold',
-    marginBottom: 3,
+  itemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5,
   },
-  cartItemPrice: {
+  itemPrice: {
     fontSize: 14,
     color: '#666',
-    fontFamily: 'inter-bold',
+    marginBottom: 10,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityButton: {
+    backgroundColor: '#e0e0e0',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityButtonText: {
+    fontSize: 18,
+  },
+  quantityText: {
+    marginHorizontal: 15,
+    fontSize: 16,
+  },
+  removeButton: {
+    padding: 5,
+  },
+  removeButtonText: {
+    fontSize: 24,
+    color: '#ff4444',
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   totalContainer: {
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    paddingTop: 10,
-    marginTop: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
   },
   totalText: {
     fontSize: 18,
-    fontFamily: 'inter-bold',
-    textAlign: 'right',
-    marginRight: 10,
+    fontWeight: 'bold',
   },
   checkoutButton: {
-    backgroundColor: 'black',
-    paddingVertical: 15,
-    paddingHorizontal: 80,
-    borderRadius: 30,
-    alignSelf: 'center',
-    marginTop: 15,
-    marginBottom: 20,
+    backgroundColor: '#000',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   checkoutButtonText: {
-    fontSize: 18,
-    fontFamily: 'inter-bold',
     color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

@@ -5,7 +5,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 export default function EmptyCart() {
   return (
     <View style={styles.container}>
-      <View style={{shadowColor: '#141414', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.8,shadowRadius: 5, elevation: 8,}}>
+      <View style={{shadowColor: '#141414', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.8,shadowRadius: 5, elevation: 25,}}>
       <FontAwesome name="shopping-basket" size={100} color="#ccc" />
       </View>
       <Text style={styles.text}>Your Cart Is Empty!</Text>

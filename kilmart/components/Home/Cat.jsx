@@ -84,11 +84,11 @@ const styles = StyleSheet.create({
     height: itemWidth - 20,
     resizeMode: 'contain',
     marginBottom: 10,
-    borderRadius: 10,
     backgroundColor: '#f2f2f2',
   },
   text: {
     fontSize: 13,
+    fontWeight: 'bold',
     fontFamily: 'poppins',
     textAlign: 'center',
     color: '#333',
