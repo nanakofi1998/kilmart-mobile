@@ -3,14 +3,11 @@ import React from 'react';
 import Octicons from '@expo/vector-icons/Octicons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
+import { useCart } from '../../context/CartContext';
 
 export default function Header() {
   const navigation = useNavigation();
-
-  const handleClearCart = () => {
-    // Logic to clear the cart
-    console.log('Cart cleared!');
-  };
+  const {clearCart} = useCart();
 
   return (
     <View
@@ -46,7 +43,7 @@ export default function Header() {
         </Text>
 
         {/* Clear Cart Button */}
-        <TouchableOpacity onPress={handleClearCart}>
+        <TouchableOpacity onPress={clearCart}>
           <Octicons name="trash" size={24} color="black" />
         </TouchableOpacity>
       </View>

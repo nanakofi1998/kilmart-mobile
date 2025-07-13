@@ -2,58 +2,35 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TextInput, TouchableOpacity, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
-
-// Dummy cart data
-const dummyCart = [
-  {
-    id: '1',
-    name: 'Basmati Rice',
-    image: require('../assets/images/basmati.png'),
-    price: 'GH₵ 500.00',
-    quantity: 2,
-  },
-  {
-    id: '2',
-    name: 'Doughnut',
-    image: require('../assets/images/doughnut.png'),
-    price: 'GH₵ 120.00',
-    quantity: 1,
-  },
-  {
-    id: '3',
-    name: 'Chips Ahoy',
-    image: require('../assets/images/ahoy.png'),
-    price: 'GH₵ 68.00',
-    quantity: 3,
-  },
-];
+import { useCart } from '../context/CartContext';
 
 export default function Checkout() {
-  const [modalVisible, setModalVisible] = useState(false);
-
-  // Calculate the total price
-  const totalPrice = dummyCart.reduce(
-    (sum, item) => sum + parseFloat(item.price.replace('GH₵ ', '')) * item.quantity,
-    0
-  );
+  const { cartItems, totalPrice, totalItems } = useCart();
 
   return (
     <View style={styles.container}>
-        <Text style={styles.sectionTitle}>Order Summary</Text>
+      <Text style={styles.sectionTitle}>Order Summary ({totalItems} items)</Text>
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Order Summary Section */}
         <View style={styles.section}>
-          {dummyCart.map((item) => (
+          {cartItems.map((item) => (
             <View key={item.id} style={styles.cartItem}>
-              <Image source={item.image} style={styles.cartItemImage} />
+              <Image source={{ uri: item.product_image }} style={styles.cartItemImage} />
               <View style={styles.cartItemDetails}>
                 <Text style={styles.cartItemName}>{item.name}</Text>
                 <Text style={styles.cartItemPrice}>
-                  {item.price} x {item.quantity}
+                  GH₵{item.price.toFixed(2)} x {item.quantity}
                 </Text>
               </View>
             </View>
           ))}
+
+          {cartItems.length === 0 && (
+            <Text style={{ textAlign: 'center', color: '#666', marginTop: 20 }}>
+              Your cart is empty.
+            </Text>
+          )}
         </View>
 
         {/* Total Price Section */}
@@ -62,29 +39,12 @@ export default function Checkout() {
         </View>
 
         {/* Payment Button */}
-        <TouchableOpacity style={styles.paymentButton} onPress={() => setModalVisible(true)}>
-          <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
-        </TouchableOpacity>
+        {cartItems.length > 0 && (
+          <TouchableOpacity style={styles.paymentButton} onPress={() => router.push('/payment')}>
+            <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
-
-      {/* Delivery Details Modal */}
-      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Delivery Details <MaterialIcons name="delivery-dining" size={30} color="black" /></Text>
-
-            <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#999" />
-            <TextInput style={styles.input} placeholder="Phone Number" placeholderTextColor="#999" keyboardType="phone-pad" />
-            <TextInput style={styles.input} placeholder="Delivery Address" placeholderTextColor="#999" />
-            <TextInput style={styles.input} placeholder="City" placeholderTextColor="#999" />
-
-            {/* Close Modal & Proceed */}
-            <TouchableOpacity style={styles.modalButton} onPress={() => { setModalVisible(false); router.push('/payment'); }}>
-              <Text style={styles.modalButtonText}>Confirm & Continue</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -94,7 +54,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     paddingTop: 60,
-    padding: 20
+    padding: 20,
   },
   section: {
     marginBottom: 20,
@@ -118,6 +78,7 @@ const styles = StyleSheet.create({
     height: 70,
     resizeMode: 'contain',
     marginRight: 10,
+    borderRadius: 8,
   },
   cartItemDetails: {
     flex: 1,
@@ -152,47 +113,6 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   paymentButtonText: {
-    fontSize: 18,
-    fontFamily: 'inter-bold',
-    color: '#fff',
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Dark overlay
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontFamily: 'inter-bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  input: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  modalButton: {
-    backgroundColor: 'black',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginBottom:20,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginTop: 15,
-  },
-  modalButtonText: {
     fontSize: 18,
     fontFamily: 'inter-bold',
     color: '#fff',
