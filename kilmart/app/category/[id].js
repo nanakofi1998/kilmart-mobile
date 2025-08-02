@@ -206,8 +206,8 @@ export default function CategoryScreen() {
   const renderProductItem = ({ item }) => (
     <View style={styles.item}>
       <Image source={{ uri: item.product_image }} style={styles.itemImage} />
-      <Text style={styles.itemName}>{item.name}</Text>
-      <Text style={styles.itemDescription}>{item.description}</Text>
+      <Text style={styles.itemName} numberOfLines={2} ellipsizeMode='tail'>{item.name}</Text>
+      <Text style={styles.itemDescription} numberOfLines={2} ellipsizeMode='tail'>{item.description}</Text>
       <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
       <TouchableOpacity
         style={styles.addButton}
@@ -369,12 +369,22 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 14,
     textAlign: 'center',
-    fontWeight: '400',
+    fontWeight: '600',
+    height: 26,
+    lineHeight: 15,
+    fontFamily: 'inter',
+    overflow: 'hidden',
+    width: '100%',
   },
   itemDescription: {
     fontSize: 10,
     textAlign: 'center',
     fontFamily: 'inter',
+    height: 26, // Fixed height for 2 lines
+    lineHeight: 16, // Proper line spacing
+    overflow: 'hidden', // Important for truncation
+    width: '100%', // Needed for proper text wrapping
+    marginTop: 4,
   },
   itemPrice: {
     fontWeight: 'bold',

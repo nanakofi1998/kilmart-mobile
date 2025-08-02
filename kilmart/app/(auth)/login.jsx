@@ -27,7 +27,6 @@ export default function LoginScreen() {
     });
     setShowAlert(true);
     
-    // Auto-dismiss success alerts after 1.5 seconds
     if (isSuccess) {
       setTimeout(() => {
         setShowAlert(false);
@@ -36,43 +35,63 @@ export default function LoginScreen() {
     }
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    if(!email || !password) {
-      displayAlert('Error', 'Please enter both email and password');
-      setLoading(false);
-      return;
+ const handleLogin = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+
+  if (!email || !password) {
+    displayAlert('Error', 'Please enter both email and password');
+    setLoading(false);
+    return;
+  }
+
+  if (!/\S+@\S+\.\S+/.test(email)) {
+    displayAlert('Error', 'Please enter a valid email address');
+    setLoading(false);
+    return;
+  }
+
+  const credentials = { email, password };
+
+  try {
+    const response = await apiClient.post('/auth/jwt/create/', credentials);
+    //console.log('Response data:', JSON.stringify(response.data, null, 2)); // Debug the response
+
+    const { access, refresh , user } = response.data;
+
+    // Validate access is a string
+    if (typeof access !== 'string') {
+      throw new Error('Invalid response: access token must be a string');
     }
-    
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      displayAlert('Error', 'Please enter a valid email address');
-      setLoading(false);
-      return;
+
+    if (typeof refresh === 'string') {
+  await SecureStore.setItemAsync('refresh', refresh);
+}
+
+    // Validate full_name is a string or null/undefined
+    const full_name = user?.full_name;
+    if (typeof full_name !== 'string' && full_name !== null && full_name !== undefined) {
+      throw new Error('Invalid response: full_name must be a string or null/undefined');
     }
 
-    const credentials = { email, password };
+    // Store access token
+    await SecureStore.setItemAsync('access', access);
+    // await SecureStore.deleteItemAsync('refresh'); // Ensure refresh token is cleared if not used
+    // Store full_name, default to empty string if null/undefined
+    await SecureStore.setItemAsync('user-name', full_name || '');
 
-    try {
-      const response = await apiClient.post('/auth/jwt/create/', credentials);
-      // console.log(credentials)
-      // console.log('Fetched token from SecureStore:', access);
-      const { access, full_name } = response.data;
-
-      await SecureStore.setItemAsync('access', access);
-      await SecureStore.setItemAsync('user-name', full_name);
-
-      displayAlert('Success', 'Login successful!', true);
-    } catch (error) {
-      console.log(error);
-      const errorMessage = error.response?.data?.message || 
-        "Failed to login. Please check your credentials or try again later";
-      displayAlert('Error', errorMessage);
-    } finally {
-      setLoading(false);
-    } 
-  };
+    displayAlert('Success', 'Login successful!', true);
+  } catch (error) {
+    console.error('Login error:', error);
+    const errorMessage =
+      error.response?.data?.message ||
+      error.message ||
+      'Failed to login. Please check your credentials or try again later';
+    displayAlert('Error', errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
   
 
   return (

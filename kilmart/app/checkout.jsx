@@ -7,6 +7,16 @@ import { useCart } from '../context/CartContext';
 export default function Checkout() {
   const { cartItems, totalPrice, totalItems } = useCart();
 
+  const handleCheckout = () => {
+    router.push({
+      pathname: '/payment',
+      params: {
+        cartItems: JSON.stringify(cartItems),
+        totalPrice: totalPrice,
+      }
+    });
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Order Summary ({totalItems} items)</Text>
@@ -40,8 +50,8 @@ export default function Checkout() {
 
         {/* Payment Button */}
         {cartItems.length > 0 && (
-          <TouchableOpacity style={styles.paymentButton} onPress={() => router.push('/payment')}>
-            <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
+          <TouchableOpacity style={styles.paymentButton} onPress={handleCheckout}>
+            <Text style={styles.paymentButtonText}>Checkout</Text>
           </TouchableOpacity>
         )}
       </ScrollView>

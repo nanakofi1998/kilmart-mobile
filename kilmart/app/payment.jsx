@@ -1,162 +1,210 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, ScrollView, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import AwesomeAlert from 'react-native-awesome-alerts';
+import { useLocalSearchParams, router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import apiClient from '../utils/apiClient';
 
-export default function Payment() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedMethod, setSelectedMethod] = useState(null);
+export function Payment() {
+  const { cartItems: cartItemsString, totalPrice } = useLocalSearchParams();
+  const cartItems = JSON.parse(cartItemsString || '[]');
+
+  const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [cardDetails, setCardDetails] = useState({ cardNumber: '', expiryDate: '', cvv: '' });
-
-  const [deliveryDetails, setDeliveryDetails] = useState({ fullName: '', phone: '', address: '', city: '' });
+  const [shippingAddress, setShippingAddress] = useState('');
   const [saveAsDefault, setSaveAsDefault] = useState(false);
+  const [isDeliveryDetailsComplete, setIsDeliveryDetailsComplete] = useState(false);
   const [alert, setAlert] = useState({ show: false, title: '', message: '' });
+  const [paymentReference, setPaymentReference] = useState('');
+  const [orderId, setOrderId] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const showAlert = (title, message) => {
     setAlert({ show: true, title, message });
   };
 
-  const handleMethodSelect = (method) => {
-    setSelectedMethod(method);
-  };
+  const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
 
-  const handleProceedToPayment = () => {
-    const { fullName, phone, address, city } = deliveryDetails;
-    if (!fullName || !phone || !address || !city) {
-      showAlert('Incomplete Details', 'Please fill in all delivery fields.');
+  const handleConfirmDetails = () => {
+    if (!email || !phoneNumber || !shippingAddress) {
+      showAlert('Error', 'Please fill in all delivery details');
       return;
     }
-    setCurrentStep(2);
+    if (!validateEmail(email)) {
+      showAlert('Error', 'Please enter a valid email address');
+      return;
+    }
+    if (!/^\d{10,}$/.test(phoneNumber.replace(/\D/g, ''))) {
+      showAlert('Error', 'Please enter a valid phone number');
+      return;
+    }
+    setIsDeliveryDetailsComplete(true);
+    showAlert('Success', 'Delivery details confirmed!');
   };
 
-  const handlePayment = () => {
-    if (selectedMethod === 'momo' || selectedMethod === 'telecel') {
-      if (!phoneNumber) {
-        showAlert('Missing info', 'Please enter your phone number.');
-        return;
+  const payNow = async () => {
+    try {
+      setIsProcessingPayment(true);
+      console.log('Cart items:', JSON.stringify(cartItems, null, 2));
+      const payload = {
+        shipping_address: shippingAddress,
+        billing_address: shippingAddress,
+        payment_method: 'Mobile Money',
+        items: cartItems.map(item => ({
+          product_id: item.id,
+          quantity: item.quantity,
+        })),
+      };
+
+      console.log('Order payload:', JSON.stringify(payload, null, 2));
+
+      const response = await apiClient.post('/v1/create/', payload);
+      console.log('Order response:', JSON.stringify(response.data, null, 2));
+
+      const { payment_info, order_id } = response.data;
+
+      if (!payment_info?.authorization_url || !order_id) {
+        throw new Error('No payment URL or order ID provided in response');
       }
-      showAlert('Success', `Payment via ${selectedMethod === 'momo' ? 'MTN MoMo' : 'Telecel Cash'} processed.`);
-    } else if (selectedMethod === 'card') {
-      const { cardNumber, expiryDate, cvv } = cardDetails;
-      if (!cardNumber || !expiryDate || !cvv) {
-        showAlert('Incomplete Card Info', 'Please fill in all card fields.');
-        return;
-      }
-      showAlert('Success', 'Card payment processed.');
-    } else {
-      showAlert('Select Method', 'Please choose a payment method.');
+
+      console.log('Opening payment URL:', payment_info.authorization_url);
+      setPaymentReference(payment_info.reference);
+      setOrderId(order_id);
+      await WebBrowser.openBrowserAsync(payment_info.authorization_url, {
+        toolbarColor: '#000000',
+        showTitle: true,
+        enableDefaultShareMenuItem: false,
+        showInRecents: true,
+      });
+    } catch (error) {
+      console.error('Payment error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        url: error.config?.url,
+        status: error.response?.status,
+        responseData: JSON.stringify(error.response?.data, null, 2),
+      });
+      const errorMessage =
+        error.response?.data?.error ||
+        error.message ||
+        'An error occurred while creating the order. Please try again.';
+      showAlert('Error', errorMessage);
+      setIsProcessingPayment(false);
     }
   };
 
-  const renderStepper = () => (
-    <View style={styles.stepper}>
-      <View style={[styles.step, currentStep >= 1 && styles.activeStep]}>
-        <Text style={styles.stepText}>1</Text>
-      </View>
-      <View style={styles.stepLine} />
-      <View style={[styles.step, currentStep >= 2 && styles.activeStep]}>
-        <Text style={styles.stepText}>2</Text>
-      </View>
-    </View>
-  );
+  useEffect(() => {
+    const handleDeepLink = ({ url }) => {
+      console.log('Deep link received:', url);
+      if (url.includes('payment-callback') && orderId && paymentReference) {
+        setIsProcessingPayment(false);
+        showAlert('Success', 'Payment completed! Redirecting to orders...');
+        setTimeout(() => {
+          router.replace('/orders');
+          WebBrowser.dismissBrowser();
+        }, 1000);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    return () => subscription.remove();
+  }, [orderId, paymentReference]);
 
   return (
-    <ScrollView style={styles.container}>
-      {renderStepper()}
-
-      {currentStep === 1 && (
-        <View>
+    <View style={styles.container}>
+      {isProcessingPayment ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#000" />
+          <Text style={styles.loadingText}>Processing payment...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollContainer}>
           <Text style={styles.sectionTitle}>
             Delivery Details <FontAwesome5 name="shipping-fast" size={22} />
           </Text>
 
-          <TextInput style={styles.input} placeholder="Full Name" value={deliveryDetails.fullName}
-            onChangeText={(text) => setDeliveryDetails({ ...deliveryDetails, fullName: text })} />
-          <TextInput style={styles.input} placeholder="Phone Number" keyboardType="phone-pad" value={deliveryDetails.phone}
-            onChangeText={(text) => setDeliveryDetails({ ...deliveryDetails, phone: text })} />
-          <TextInput style={styles.input} placeholder="Delivery Address" value={deliveryDetails.address}
-            onChangeText={(text) => setDeliveryDetails({ ...deliveryDetails, address: text })} />
+          <TextInput
+            style={styles.input}
+            placeholder="Email Address"
+            value={email}
+            onChangeText={setEmail}
+            editable={!isDeliveryDetailsComplete}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Phone Number"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            editable={!isDeliveryDetailsComplete}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Delivery Address"
+            value={shippingAddress}
+            onChangeText={setShippingAddress}
+            editable={!isDeliveryDetailsComplete}
+          />
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Save as default address</Text>
-            <Switch value={saveAsDefault} onValueChange={setSaveAsDefault} />
+            <Switch
+              value={saveAsDefault}
+              onValueChange={setSaveAsDefault}
+              disabled={isDeliveryDetailsComplete}
+            />
           </View>
 
-          <TouchableOpacity style={styles.paymentButton} onPress={handleProceedToPayment}>
-            <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {currentStep === 2 && (
-        <View>
-          <Text style={styles.sectionTitle}>
-            Payment Method <FontAwesome5 name="money-bill-wave" size={22} />
-          </Text>
-
-          {['momo', 'telecel', 'card'].map((method) => (
-            <TouchableOpacity key={method} style={[styles.paymentMethod, selectedMethod === method && styles.selectedMethod]}
-              onPress={() => handleMethodSelect(method)}>
-              <Image source={
-                method === 'momo' ? require('../assets/images/momo.jpeg') :
-                method === 'telecel' ? require('../assets/images/telecash.webp') :
-                require('../assets/images/visa.webp')
-              } style={styles.paymentMethodIcon} />
-              <Text style={styles.paymentMethodText}>
-                {method === 'momo' ? 'MTN MoMo' : method === 'telecel' ? 'Telecel Cash' : 'Card Payment'}
+          {!isDeliveryDetailsComplete ? (
+            <TouchableOpacity style={styles.paymentButton} onPress={handleConfirmDetails}>
+              <Text style={styles.paymentButtonText}>Confirm Details</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.paymentButton, { opacity: isProcessingPayment ? 0.5 : 1 }]}
+              onPress={payNow}
+              disabled={isProcessingPayment}
+            >
+              <Text style={styles.paymentButtonText}>
+                Pay with Paystack (GH₵{parseFloat(totalPrice || '0').toFixed(2)})
               </Text>
             </TouchableOpacity>
-          ))}
+          )}
 
-          {selectedMethod === 'momo' || selectedMethod === 'telecel' ? (
-            <TextInput style={styles.input} placeholder="Phone Number" keyboardType="phone-pad"
-              value={phoneNumber} onChangeText={setPhoneNumber} />
-          ) : selectedMethod === 'card' ? (
-            <>
-              <TextInput style={styles.input} placeholder="Card Number" keyboardType="numeric"
-                value={cardDetails.cardNumber} onChangeText={(text) => setCardDetails({ ...cardDetails, cardNumber: text })} />
-              <TextInput style={styles.input} placeholder="Expiry Date (MM/YY)" keyboardType="numeric"
-                value={cardDetails.expiryDate} onChangeText={(text) => setCardDetails({ ...cardDetails, expiryDate: text })} />
-              <TextInput style={styles.input} placeholder="CVV" keyboardType="numeric" secureTextEntry
-                value={cardDetails.cvv} onChangeText={(text) => setCardDetails({ ...cardDetails, cvv: text })} />
-            </>
-          ) : null}
-
-          <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
-            <Text style={styles.paymentButtonText}>Make Payment</Text>
-          </TouchableOpacity>
-        </View>
+          <AwesomeAlert
+            show={alert.show}
+            title={alert.title}
+            message={alert.message}
+            closeOnTouchOutside={true}
+            showConfirmButton={true}
+            confirmText="Okay"
+            confirmButtonColor="#333"
+            onConfirmPressed={() => setAlert({ ...alert, show: false })}
+          />
+        </ScrollView>
       )}
-
-      <AwesomeAlert
-        show={alert.show}
-        title={alert.title}
-        message={alert.message}
-        closeOnTouchOutside={true}
-        showConfirmButton={true}
-        confirmText="Okay"
-        confirmButtonColor="#333"
-        onConfirmPressed={() => setAlert({ ...alert, show: false })}
-      />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20, paddingTop: 60 },
-  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 30 },
-  step: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#ccc', alignItems: 'center', justifyContent: 'center' },
-  activeStep: { backgroundColor: '#000' },
-  stepLine: { width: 50, height: 2, backgroundColor: '#ccc' },
-  stepText: { color: '#fff', fontWeight: 'bold' },
-  sectionTitle: { fontSize: 24, fontFamily: 'inter-bold', marginBottom: 10, color: '#333' },
-  paymentMethod: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 10, padding: 15, marginBottom: 10 },
-  selectedMethod: { backgroundColor: '#e0f7fa' },
-  paymentMethodIcon: { width: 30, height: 30, resizeMode: 'contain', marginRight: 10 },
-  paymentMethodText: { fontSize: 16, fontFamily: 'inter-bold', color: '#333' },
-  input: { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 15, marginBottom: 10, fontSize: 16, color: '#333'},
-  paymentButton: { backgroundColor: '#d5d5d5', paddingVertical: 15, borderRadius: 50, alignItems: 'center', marginTop: 20, elevation: 50, borderWidth: 1, shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 5 }, shadowRadius: 15},
-  paymentButtonText: { fontSize: 18, fontFamily: 'inter-bold', color: '#000' },
+  container: { flex: 1, backgroundColor: '#fff' },
+  scrollContainer: { flex: 1, padding: 20, paddingTop: 60 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 10, fontSize: 16, color: '#333' },
+  sectionTitle: { fontSize: 24, fontFamily: 'inter-bold', marginBottom: 15, marginTop: 20, color: '#333' },
+  input: { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 15, marginBottom: 10, fontSize: 16, color: '#333' },
+  paymentButton: {
+    backgroundColor: 'black',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  paymentButtonText: { fontSize: 18, fontFamily: 'inter-bold', color: '#fff' },
   switchRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 10 },
   switchLabel: { fontSize: 16, flex: 1, fontFamily: 'inter-medium', color: '#333' },
 });
+
+export default Payment;

@@ -15,10 +15,10 @@ export default function RootLayout() {
   }
 
   return (
-    <CartProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)"></Stack.Screen>
-      </Stack>
-    </CartProvider>
+      <CartProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)"></Stack.Screen>
+        </Stack>
+      </CartProvider>
   )
 }
