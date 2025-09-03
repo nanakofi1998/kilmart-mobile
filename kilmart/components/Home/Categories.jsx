@@ -12,7 +12,7 @@ export default function Categories() {
   const router = useRouter();
 
   useEffect(() => {
-    apiClient.get('/categories')
+    apiClient.get('api/categories/')
       .then((response) => {
         setCategories(response.data);
       })

@@ -41,7 +41,7 @@ export default function Orders() {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get('/v1/list/');
+        const response = await apiClient.get('api/v1/list/');
         console.log('Orders response:', JSON.stringify(response.data, null, 2));
         setOrders(response.data);
         setLoading(false);
@@ -59,7 +59,7 @@ export default function Orders() {
     try {
       setModalLoading(true);
       setModalError(null);
-      const response = await apiClient.get(`/v1/${orderId}/`);
+      const response = await apiClient.get(`api/v1/${orderId}/`);
       console.log('Order details response:', JSON.stringify(response.data, null, 2));
       setSelectedOrder(response.data);
       setModalLoading(false);
@@ -245,6 +245,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: 'black',
     marginLeft: 10,
+    alignItems: 'center',
   },
   listContainer: {
     padding: 20,

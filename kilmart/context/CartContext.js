@@ -51,6 +51,12 @@ export const CartProvider = ({ children }) => {
     await saveStoredCart(updatedCart);
   };
 
+  const removeItemsByIds = async (itemIds) => {
+    const updatedCart = cartItems.filter(item => !itemIds.includes(item.id));
+    setCartItems(updatedCart);
+    await saveStoredCart(updatedCart);
+  };
+
   const updateItemQuantity = async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
     const updatedCart = cartItems.map(item =>
@@ -74,6 +80,7 @@ export const CartProvider = ({ children }) => {
         cartItems,
         addToCart,
         removeFromCart,
+        removeItemsByIds, // Add this new function
         updateItemQuantity,
         clearCart,
         totalItems,

@@ -14,19 +14,16 @@ export default function LoginScreen() {
   const [alertConfig, setAlertConfig] = useState({
     title: '',
     message: '',
-    isSuccess: false
+    isSuccess: false,
   });
-  
+
   const router = useRouter();
 
   const displayAlert = (title, message, isSuccess = false) => {
-    setAlertConfig({
-      title,
-      message,
-      isSuccess
-    });
+    setShowAlert(false);
+    setAlertConfig({ title, message, isSuccess });
     setShowAlert(true);
-    
+
     if (isSuccess) {
       setTimeout(() => {
         setShowAlert(false);
@@ -35,161 +32,174 @@ export default function LoginScreen() {
     }
   };
 
- const handleLogin = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleLogin = async () => {
+    setLoading(true);
 
-  if (!email || !password) {
-    displayAlert('Error', 'Please enter both email and password');
-    setLoading(false);
-    return;
-  }
-
-  if (!/\S+@\S+\.\S+/.test(email)) {
-    displayAlert('Error', 'Please enter a valid email address');
-    setLoading(false);
-    return;
-  }
-
-  const credentials = { email, password };
-
-  try {
-    const response = await apiClient.post('/auth/jwt/create/', credentials);
-    //console.log('Response data:', JSON.stringify(response.data, null, 2)); // Debug the response
-
-    const { access, refresh , user } = response.data;
-
-    // Validate access is a string
-    if (typeof access !== 'string') {
-      throw new Error('Invalid response: access token must be a string');
+    if (!email || !password) {
+      displayAlert('Error', 'Please enter both email and password');
+      setTimeout(() => setLoading(false), 100);
+      return;
     }
 
-    if (typeof refresh === 'string') {
-  await SecureStore.setItemAsync('refresh', refresh);
-}
-
-    // Validate full_name is a string or null/undefined
-    const full_name = user?.full_name;
-    if (typeof full_name !== 'string' && full_name !== null && full_name !== undefined) {
-      throw new Error('Invalid response: full_name must be a string or null/undefined');
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      displayAlert('Error', 'Please enter a valid email address');
+      setTimeout(() => setLoading(false), 100);
+      return;
     }
 
-    // Store access token
-    await SecureStore.setItemAsync('access', access);
-    // await SecureStore.deleteItemAsync('refresh'); // Ensure refresh token is cleared if not used
-    // Store full_name, default to empty string if null/undefined
-    await SecureStore.setItemAsync('user-name', full_name || '');
+    const credentials = { email, password };
 
-    displayAlert('Success', 'Login successful!', true);
-  } catch (error) {
-    console.error('Login error:', error);
-    const errorMessage =
-      error.response?.data?.message ||
-      error.message ||
-      'Failed to login. Please check your credentials or try again later';
-    displayAlert('Error', errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
-  
+    try {
+      const response = await apiClient.post('api/auth/jwt/create/', credentials);
+      console.log('Login response:', JSON.stringify(response.data, null, 2));
+
+      const { access, refresh, user } = response.data;
+
+      if (typeof access !== 'string') {
+        throw new Error('Invalid response: access token must be a string');
+      }
+
+      if (typeof refresh !== 'string') {
+        throw new Error('Invalid response: refresh token must be a string');
+      }
+
+      const full_name = user?.full_name;
+      if (typeof full_name !== 'string' && full_name !== null && full_name !== undefined) {
+        throw new Error('Invalid response: full_name must be a string or null/undefined');
+      }
+
+      console.log('Storing tokens and user data:', {
+        access: access.substring(0, 20) + '...',
+        refresh: refresh.substring(0, 20) + '...',
+        full_name,
+      });
+      await Promise.all([
+        SecureStore.setItemAsync('access', access),
+        SecureStore.setItemAsync('refresh', refresh),
+        SecureStore.setItemAsync('user-name', full_name || ''),
+      ]);
+
+      displayAlert('Success', 'Login successful!', true);
+    } catch (error) {
+      console.error('Login error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      });
+      let errorMessage = 'Failed to login. Please try again later.';
+      if (error.response?.status === 401) {
+        errorMessage = error.response?.data?.detail || error.response?.data?.non_field_errors?.[0] || 'Invalid email or password.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      displayAlert('Error', errorMessage);
+      setTimeout(() => setLoading(false), 100);
+    }
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <Image 
-        source={require('./../../assets/images/bnr.png')} 
-        style={{ 
-          width: '100%', 
-          height: 200, 
-          borderBottomLeftRadius: 10, 
-          borderBottomRightRadius: 10 
-        }} 
+      <Image
+        source={require('./../../assets/images/bnr.png')}
+        style={{
+          width: '100%',
+          height: 200,
+          borderBottomLeftRadius: 10,
+          borderBottomRightRadius: 10,
+        }}
       />
-      
+
       <View style={{ padding: 20 }}>
-        <Text style={{ 
-          fontSize: 28, 
-          fontFamily: 'inter',
-          fontWeight: 'bold', 
-          marginBottom: 20 
-        }}>
+        <Text
+          style={{
+            fontSize: 28,
+            fontFamily: 'inter-bold',
+            marginBottom: 20,
+          }}
+        >
           Login
         </Text>
-        
-        <AuthInput 
-          placeholder="Email address" 
-          value={email} 
-          onChangeText={setEmail} 
+
+        <AuthInput
+          placeholder="Email address"
+          value={email}
+          onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <AuthInput 
-          placeholder="Password" 
-          secure 
-          value={password} 
-          onChangeText={setPassword} 
+        <AuthInput
+          placeholder="Password"
+          secure
+          value={password}
+          onChangeText={setPassword}
           autoCapitalize="none"
         />
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={{ alignSelf: 'flex-end', marginVertical: 5 }}
           onPress={() => router.push('/forgot-password')}
         >
           <Text style={{ color: '#f1b811' }}>Forgot password?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={{ 
-            backgroundColor: '#f1b811', 
-            padding: 16, 
-            borderRadius: 12, 
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#f1b811',
+            padding: 16,
+            borderRadius: 12,
             marginVertical: 20,
             flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
-            opacity: loading ? 0.7 : 1
-          }} 
+            opacity: loading ? 0.7 : 1,
+          }}
           onPress={handleLogin}
           disabled={loading}
         >
           {loading ? (
-            <>
-              <ActivityIndicator size="small" color="#fff" />
-            </>
+            <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={{ 
-              textAlign: 'center', 
-              color: '#fff', 
-              fontWeight: 'bold' 
-            }}>
+            <Text
+              style={{
+                textAlign: 'center',
+                color: '#fff',
+                fontFamily: 'inter-bold',
+              }}
+            >
               Login
             </Text>
           )}
         </TouchableOpacity>
 
-        <Text style={{ 
-          textAlign: 'center', 
-          marginVertical: 10, 
-          fontStyle: 'italic', 
-          fontWeight: 'bold'  
-        }}>
+        <Text
+          style={{
+            textAlign: 'center',
+            marginVertical: 10,
+            fontFamily: 'inter-medium',
+            fontStyle: 'italic',
+          }}
+        >
           Don't have an account?
         </Text>
 
-        <TouchableOpacity 
-          style={{ 
-            backgroundColor: '#b0b8ba', 
-            padding: 16, 
-            borderRadius: 12, 
-            marginVertical: 20 
-          }} 
-          onPress={() => router.push('/sign-up')}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#b0b8ba',
+            padding: 16,
+            borderRadius: 12,
+            marginVertical: 20,
+          }}
+          onPress={() => router.push('/signup')}
         >
-          <Text style={{ 
-            textAlign: 'center', 
-            color: '#000', 
-            fontWeight: 'bold' 
-          }}>
+          <Text
+            style={{
+              textAlign: 'center',
+              color: '#000',
+              fontFamily: 'inter-bold',
+            }}
+          >
             Sign up
           </Text>
         </TouchableOpacity>
@@ -201,20 +211,15 @@ export default function LoginScreen() {
           message={alertConfig.message}
           closeOnTouchOutside={true}
           closeOnHardwareBackPress={false}
-          showCancelButton={false}
-          showConfirmButton={!alertConfig.isSuccess} // Only show confirm button for error messages
+          showConfirmButton={!alertConfig.isSuccess}
           confirmText="OK"
-          confirmButtonColor={alertConfig.isSuccess ? "#4CAF50" : "#DD6B55"}
-          onConfirmPressed={() => {
-            setShowAlert(false);
-          }}
-          onDismiss={() => {
-            setShowAlert(false);
-          }}
+          confirmButtonColor={alertConfig.isSuccess ? '#4CAF50' : '#DD6B55'}
+          onConfirmPressed={() => setShowAlert(false)}
+          onDismiss={() => setShowAlert(false)}
         />
 
-        <Text style={{ marginTop: 20, textAlign: 'center', fontSize: 12 }}>
-          By clicking create account you agree to {' '}
+        <Text style={{ marginTop: 20, textAlign: 'center', fontSize: 12, fontFamily: 'inter-medium' }}>
+          By clicking create account you agree to{' '}
           <Text style={{ color: '#f1b811' }}>Terms of use</Text> and{' '}
           <Text style={{ color: '#f1b811' }}>Privacy policy</Text>
         </Text>

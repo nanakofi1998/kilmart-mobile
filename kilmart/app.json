@@ -16,7 +16,21 @@
         "foregroundImage": "./assets/images/kwikmart.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.kevinlauren1998.kilmart"
+      "package": "com.kevinlauren1998.kilmart",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "yourapp"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",

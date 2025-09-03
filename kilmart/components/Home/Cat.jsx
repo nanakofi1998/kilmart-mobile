@@ -15,7 +15,7 @@ export default function Cat() {
   // Fetch categories from API
   const fetchCategories = async () => {
     try {
-      const response = await apiClient.get('categories/');
+      const response = await apiClient.get('api/categories/');
       setCategories(response.data);
       setLoading(false);
     } catch (err) {

@@ -14,7 +14,7 @@ const Category = () => {
 
     const fetchCategoryById = async (categoryId) => {
         try {
-            const response = await fetch(`/api/categories/${categoryId}`);
+            const response = await fetch(`api/categories/${categoryId}`);
             const data = await response.json();
             setCategory(data);
         } catch (error) {

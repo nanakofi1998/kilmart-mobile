@@ -85,7 +85,7 @@ export default function CategoryScreen() {
 
   useFocusEffect(useCallback(() => {
     const initialize = async () => {
-      const cats = await fetchData('categories/', 'categories', 'categories');
+      const cats = await fetchData('api/categories/', 'categories', 'categories');
       if (state.selectedMainTab) {
         await handleMainTabChange(state.selectedMainTab);
       } else if (cats.length > 0) {
@@ -102,7 +102,7 @@ export default function CategoryScreen() {
       loading: { ...prev.loading, subCategories: true, items: true }
     }));
 
-    const subs = await fetchData(`categories/${categoryId}/subcategories/`, 'subCategories', 'subCategories');
+    const subs = await fetchData(`api/categories/${categoryId}/subcategories/`, 'subCategories', 'subCategories');
 
     if (subs.length > 0) {
       handleSubTabChange(subs[0].id);
@@ -118,7 +118,7 @@ export default function CategoryScreen() {
       loading: { ...prev.loading, items: true }
     }));
 
-    await fetchData(`subcategories/${subCategoryId}/products/`, 'items', 'items');
+    await fetchData(`api/subcategories/${subCategoryId}/products/`, 'items', 'items');
 
     scrollToTab(subCategoryId, subScrollViewRef);
   }, [fetchData, scrollToTab]);
@@ -206,9 +206,9 @@ export default function CategoryScreen() {
   const renderProductItem = ({ item }) => (
     <View style={styles.item}>
       <Image source={{ uri: item.product_image }} style={styles.itemImage} />
+      <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
       <Text style={styles.itemName} numberOfLines={2} ellipsizeMode='tail'>{item.name}</Text>
       <Text style={styles.itemDescription} numberOfLines={2} ellipsizeMode='tail'>{item.description}</Text>
-      <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => handleAddToCart(item)}
@@ -352,9 +352,10 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
   },
+  
   item: {
     width: '32%',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 15,
     marginRight: '1%',
     padding: 8,
@@ -367,42 +368,48 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   itemName: {
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 12,
+    textAlign: 'start',
     fontWeight: '600',
-    height: 26,
+    height: 16,
     lineHeight: 15,
     fontFamily: 'inter',
     overflow: 'hidden',
     width: '100%',
   },
   itemDescription: {
-    fontSize: 10,
-    textAlign: 'center',
+    fontSize: 12,
+    textAlign: 'start',
     fontFamily: 'inter',
-    height: 26, // Fixed height for 2 lines
+    height: 16, // Fixed height for 2 lines
     lineHeight: 16, // Proper line spacing
     overflow: 'hidden', // Important for truncation
     width: '100%', // Needed for proper text wrapping
     marginTop: 4,
   },
   itemPrice: {
-    fontWeight: 'bold',
     marginTop: 5,
-    fontSize: 14,
+    fontSize: 12,
+    color: '#000000ff',
+    fontFamily: 'inter',
+    textAlign:'start',
+    lineHeight: 16,
   },
   addButton: {
     marginTop: 8,
-    padding: 8,
-    backgroundColor: '#000',
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#efb506ff',
+    backgroundColor: '#ffffffff',
     borderRadius: 50,
     width: '100%',
     alignItems: 'center',
   },
   addButtonText: {
     fontSize: 12,
-    color: '#fff',
+    color: '#000000ff',
     fontWeight: 'bold',
+    fontFamily: 'inter'
   },
   modalOverlay: {
     flex: 1,
@@ -432,7 +439,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     fontSize: 14,
     textAlign: 'center',
-    color: 'red',
+    color: '#000',
     marginTop: 5,
   },
   modalItemPrice: {
@@ -447,8 +454,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   quantityButton: {
-    padding: 10,
-    backgroundColor: 'black',
+    padding: 5,
+    backgroundColor: '#eba500ff',
     borderRadius: 20,
   },
   quantityInput: {
@@ -459,7 +466,7 @@ const styles = StyleSheet.create({
   },
   modalAddButton: {
     padding: 15,
-    backgroundColor: 'black',
+    backgroundColor: '#eba500ff',
     borderRadius: 50,
     width: '100%',
     alignItems: 'center',
