@@ -25,7 +25,6 @@ export default function VerifyOTP() {
       const payload = {
         email,
         otp,
-        purpose: purpose || 'signup'
       };
 
       const response = await apiClient.post('api/auth/verify-otp/', payload);
