@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
 import AwesomeAlert from 'react-native-awesome-alerts';
 import apiClient from '../../utils/apiClient';
 
-export default function VerifyOTP() {
-  const { email, purpose } = useLocalSearchParams();
-  const [otp, setOtp] = useState('');
+export default function ForgotPassword() {
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [alert, setAlert] = useState({ show: false, title: '', message: '' });
 
@@ -14,9 +13,16 @@ export default function VerifyOTP() {
     setAlert({ show: true, title, message });
   };
 
-  const handleVerifyOTP = async () => {
-    if (!otp || otp.length < 6) {
-      showAlert('Error', 'Please enter a valid 6-digit OTP');
+  const handleSendResetLink = async () => {
+    if (!email) {
+      showAlert('Error', 'Please enter your email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showAlert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -24,24 +30,24 @@ export default function VerifyOTP() {
     try {
       const payload = {
         email,
-        otp,
+        purpose: 'password_reset'
       };
 
-      const response = await apiClient.post('api/auth/verify-otp/', payload);
+      const response = await apiClient.post('api/auth/request-password-reset/', payload);
 
-      if (response.data.status === 200) {
-        showAlert('Success', 'Email verified successfully!');
+      if (response.status === 200) {
+        showAlert('Success', 'Password reset link has been sent to your email!');
         
         setTimeout(() => {
-          router.replace('/login');
-        }, 2000);
+          router.back();
+        }, 3000);
       } else {
-        showAlert('Error', response.data.message || 'OTP verification failed');
+        showAlert('Error', response.data.message || 'Failed to send reset link');
       }
     } catch (error) {
-      console.error('OTP verification error:', error);
+      console.error('Forgot password error:', error);
       
-      let errorMessage = 'Failed to verify OTP. Please try again.';
+      let errorMessage = 'Failed to send reset link. Please try again.';
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.response?.data?.detail) {
@@ -54,57 +60,43 @@ export default function VerifyOTP() {
     }
   };
 
-  const handleResendOTP = async () => {
-    setIsLoading(true);
-    try {
-      const response = await apiClient.post('api/auth/request-new-otp/', { email, purpose: purpose || 'signup' });
-      
-      if (response.data.status === 200) {
-        showAlert('Success', 'New OTP sent to your email');
-      } else {
-        showAlert('Error', response.data.message || 'Failed to resend OTP');
-      }
-    } catch (error) {
-      console.error('Resend OTP error:', error);
-      showAlert('Error', 'Failed to resend OTP. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleBackToLogin = () => {
+    router.back();
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Verify Email</Text>
+        <Text style={styles.title}>Forgot Password</Text>
         <Text style={styles.subtitle}>
-          Enter the 6-digit code sent to{'\n'}
-          <Text style={styles.emailText}>{email}</Text>
+          Enter your email address and we'll send you a link to reset your password
         </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Enter OTP"
-          value={otp}
-          onChangeText={setOtp}
-          keyboardType="number-pad"
-          maxLength={6}
+          placeholder="Enter your email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
           editable={!isLoading}
         />
 
         <TouchableOpacity
-          style={[styles.verifyButton, isLoading && styles.verifyButtonDisabled]}
-          onPress={handleVerifyOTP}
+          style={[styles.sendButton, isLoading && styles.sendButtonDisabled]}
+          onPress={handleSendResetLink}
           disabled={isLoading}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.verifyButtonText}>Verify OTP</Text>
+            <Text style={styles.sendButtonText}>Send Reset Link</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleResendOTP} disabled={isLoading}>
-          <Text style={styles.resendText}>Didn't receive code? Resend OTP</Text>
+        <TouchableOpacity onPress={handleBackToLogin} disabled={isLoading}>
+          <Text style={styles.backText}>Back to Login</Text>
         </TouchableOpacity>
       </View>
 
@@ -144,24 +136,21 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 30,
-  },
-  emailText: {
-    fontFamily: 'inter-bold',
-    color: '#000',
+    lineHeight: 22,
   },
   input: {
     backgroundColor: '#f9f9f9',
     borderRadius: 10,
     padding: 15,
     marginBottom: 20,
-    fontSize: 18,
+    fontSize: 16,
     color: '#333',
     borderWidth: 1,
     borderColor: '#eee',
     textAlign: 'center',
     width: '80%',
   },
-  verifyButton: {
+  sendButton: {
     backgroundColor: '#f5bb00ff',
     paddingVertical: 15,
     borderRadius: 10,
@@ -169,15 +158,15 @@ const styles = StyleSheet.create({
     width: '80%',
     marginBottom: 20,
   },
-  verifyButtonDisabled: {
+  sendButtonDisabled: {
     opacity: 0.7,
   },
-  verifyButtonText: {
+  sendButtonText: {
     fontSize: 18,
     fontFamily: 'inter-bold',
     color: '#fff',
   },
-  resendText: {
+  backText: {
     fontSize: 16,
     fontFamily: 'inter-regular',
     color: '#666',

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import apiClient from '../../utils/apiClient';
 import { useCart } from '../../context/CartContext'
 
@@ -29,12 +30,28 @@ export default function CategoryScreen() {
       categories: true,
       subCategories: true,
       items: true
-    }
+    },
+    favorites: [], // Track favorite items
+    favoriteLoading: {} // Track loading state for individual favorite buttons
   });
 
   const mainScrollViewRef = useRef(null);
   const subScrollViewRef = useRef(null);
   const tabRefs = useRef({});
+
+  // Fetch user's favorites
+  const fetchFavorites = useCallback(async () => {
+    try {
+      const response = await apiClient.get('api/favourites/');
+      setState(prev => ({
+        ...prev,
+        favorites: response.data || []
+      }));
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+      // Don't show error for favorites as it's non-critical
+    }
+  }, []);
 
   const fetchData = useCallback(async (url, stateKey, loadingKey) => {
     try {
@@ -83,9 +100,70 @@ export default function CategoryScreen() {
     }
   }, []);
 
+  // Check if item is favorited
+  const isItemFavorited = useCallback((itemId) => {
+    return state.favorites.some(fav => fav.product?.id === itemId);
+  }, [state.favorites]);
+
+  // Get favorite ID for an item
+  const getFavoriteId = useCallback((itemId) => {
+    const favorite = state.favorites.find(fav => fav.product?.id === itemId);
+    return favorite?.id;
+  }, [state.favorites]);
+
+  // Toggle favorite status
+  const toggleFavorite = useCallback(async (item) => {
+    const itemId = item.id;
+    const isCurrentlyFavorite = isItemFavorited(itemId);
+    const favoriteId = getFavoriteId(itemId);
+
+    // Set loading state for this specific item
+    setState(prev => ({
+      ...prev,
+      favoriteLoading: { ...prev.favoriteLoading, [itemId]: true }
+    }));
+
+    try {
+      if (isCurrentlyFavorite && favoriteId) {
+        // Remove from favorites
+        await apiClient.delete(`api/favourites/${favoriteId}/`);
+        setState(prev => ({
+          ...prev,
+          favorites: prev.favorites.filter(fav => fav.id !== favoriteId)
+        }));
+        Alert.alert('Success', 'Removed from favorites!');
+      } else {
+        // Add to favorites
+        const response = await apiClient.post('api/favourites/', { 
+          product: itemId 
+        });
+        setState(prev => ({
+          ...prev,
+          favorites: [...prev.favorites, response.data]
+        }));
+        Alert.alert('Success', 'Added to favorites!');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      if (error.response?.status === 401) {
+        Alert.alert('Login Required', 'Please login to manage your favorites.');
+      } else {
+        Alert.alert('Error', 'Failed to update favorites. Please try again.');
+      }
+    } finally {
+      // Clear loading state for this item
+      setState(prev => ({
+        ...prev,
+        favoriteLoading: { ...prev.favoriteLoading, [itemId]: false }
+      }));
+    }
+  }, [isItemFavorited, getFavoriteId]);
+
   useFocusEffect(useCallback(() => {
     const initialize = async () => {
       const cats = await fetchData('api/categories/', 'categories', 'categories');
+      await fetchFavorites(); // Fetch favorites when screen loads
+      
       if (state.selectedMainTab) {
         await handleMainTabChange(state.selectedMainTab);
       } else if (cats.length > 0) {
@@ -203,23 +281,46 @@ export default function CategoryScreen() {
     </TouchableOpacity>
   );
 
-  const renderProductItem = ({ item }) => (
-    <View style={styles.item}>
-      <Image source={{ uri: item.product_image }} style={styles.itemImage} />
-      <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
-      <Text style={styles.itemName} numberOfLines={2} ellipsizeMode='tail'>{item.name}</Text>
-      <Text style={styles.itemDescription} numberOfLines={2} ellipsizeMode='tail'>{item.description}</Text>
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => handleAddToCart(item)}
-        disabled={item.stock === 0}
-      >
-        <Text style={styles.addButtonText}>
-          {item.stock === 0 ? 'Out of Stock' : 'ADD'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderProductItem = ({ item }) => {
+    const isFavorited = isItemFavorited(item.id);
+    const isFavoriteLoading = state.favoriteLoading[item.id];
+
+    return (
+      <View style={styles.item}>
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: item.product_image }} style={styles.itemImage} />
+          <TouchableOpacity 
+            style={styles.favoriteButton}
+            onPress={() => toggleFavorite(item)}
+            disabled={isFavoriteLoading}
+          >
+            {isFavoriteLoading ? (
+              <ActivityIndicator size="small" color="#FF5252" />
+            ) : (
+              <MaterialIcons 
+                name={isFavorited ? "favorite" : "favorite-border"} 
+                size={20} 
+                color={isFavorited ? "#FF5252" : "rgba(0,0,0,0.3)"} 
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+        
+        <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
+        <Text style={styles.itemName} numberOfLines={2} ellipsizeMode='tail'>{item.name}</Text>
+        <Text style={styles.itemDescription} numberOfLines={2} ellipsizeMode='tail'>{item.description}</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => handleAddToCart(item)}
+          disabled={item.stock === 0}
+        >
+          <Text style={styles.addButtonText}>
+            {item.stock === 0 ? 'Out of Stock' : 'ADD'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -256,7 +357,25 @@ export default function CategoryScreen() {
       >
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setState(prev => ({ ...prev, isModalVisible: false }))}>
           <View style={styles.modalContent}>
-            <Image source={{ uri: state.selectedItem?.product_image }} style={styles.modalImage} />
+            <View style={styles.modalImageContainer}>
+              <Image source={{ uri: state.selectedItem?.product_image }} style={styles.modalImage} />
+              <TouchableOpacity 
+                style={styles.modalFavoriteButton}
+                onPress={() => state.selectedItem && toggleFavorite(state.selectedItem)}
+                disabled={state.favoriteLoading[state.selectedItem?.id]}
+              >
+                {state.favoriteLoading[state.selectedItem?.id] ? (
+                  <ActivityIndicator size="small" color="#FF5252" />
+                ) : (
+                  <MaterialIcons 
+                    name={state.selectedItem && isItemFavorited(state.selectedItem.id) ? "favorite" : "favorite-border"} 
+                    size={24} 
+                    color={state.selectedItem && isItemFavorited(state.selectedItem.id) ? "#FF5252" : "#666"} 
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+            
             <Text style={styles.modalItemName}>{state.selectedItem?.name}</Text>
             <Text style={styles.modalItemStock}>available: {state.selectedItem?.stock}</Text>
             <Text style={styles.modalItemPrice}>GH₵{state.selectedItem?.price}</Text>
@@ -294,7 +413,6 @@ export default function CategoryScreen() {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   tabContainer: {
@@ -359,6 +477,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginRight: '1%',
     padding: 8,
+    position: 'relative',
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
   },
   itemImage: {
     width: 100,
@@ -366,6 +489,22 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
     borderRadius: 10,
     marginBottom: 5,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   itemName: {
     fontSize: 12,
@@ -423,12 +562,32 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
   },
+  modalImageContainer: {
+    position: 'relative',
+    alignItems: 'center',
+  },
   modalImage: {
     width: 180,
     height: 180,
     resizeMode: 'contain',
     marginBottom: 20,
     marginTop: 10,
+  },
+  modalFavoriteButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   modalItemName: {
     fontWeight: 'bold',

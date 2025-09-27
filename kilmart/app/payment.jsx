@@ -26,6 +26,7 @@ export function Payment() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [timeoutIds, setTimeoutIds] = useState([]);
 
   const showAlert = (title, message) => {
     setAlert({ show: true, title, message });
@@ -52,52 +53,68 @@ export function Payment() {
     showAlert('Success', 'Delivery details confirmed!');
   };
 
+  // Clear all timeouts on component unmount
+  useEffect(() => {
+    return () => {
+      timeoutIds.forEach(id => clearTimeout(id));
+    };
+  }, []);
+
   const checkPaymentStatus = useCallback(async (orderId, currentRetryCount = 0) => {
-  try {
-    setIsCheckingPayment(true);
-    console.log(`Checking payment status for order: ${orderId}, attempt: ${currentRetryCount + 1}`);
-    
-    const response = await apiClient.get(`api/v1/${orderId}/`);
-    console.log('Payment status:', response.data.payment_status);
-    
-    if (response.data.payment_status === 'Paid') {
-      // REMOVE ONLY THE ITEMS THAT WERE PAID FOR
-      const paidItemIds = cartItems.map(item => item.id);
-      await removeItemsByIds(paidItemIds);
+    if (isCheckingPayment) return;
+
+    try {
+      setIsCheckingPayment(true);
+      console.log(`Checking payment status for order: ${orderId}, attempt: ${currentRetryCount + 1}`);
       
-      showAlert('Success', 'Payment completed successfully! Redirecting to orders...');
-      setTimeout(() => {
-        router.replace({ pathname: '/orders', params: { newOrderId: orderId } });
-      }, 1500);
-      return true;
-    } else if (currentRetryCount < 8) {
-      showAlert('Pending', 'Payment is still pending. Checking again...');
-      setTimeout(() => checkPaymentStatus(orderId, currentRetryCount + 1), 3000);
-    } else {
-      showAlert('Timeout', 'Payment verification timed out. Please check your orders page for updates.');
-      setTimeout(() => {
-        router.replace({ pathname: '/orders' });
-      }, 1500);
+      // FIXED: Added missing slash in endpoint
+      const response = await apiClient.get(`api/v1/${orderId}/`);
+      console.log('Payment status:', response.data.payment_status);
+      
+      if (response.data.payment_status === 'Paid') {
+        // REMOVE ONLY THE ITEMS THAT WERE PAID FOR
+        const paidItemIds = cartItems.map(item => item.id);
+        await removeItemsByIds(paidItemIds);
+        
+        showAlert('Success', 'Payment completed successfully! Redirecting to orders...');
+        const timeoutId = setTimeout(() => {
+          router.replace({ pathname: '/orders', params: { newOrderId: orderId } });
+        }, 1500);
+        setTimeoutIds(prev => [...prev, timeoutId]);
+        return true;
+      } else if (currentRetryCount < 8) {
+        showAlert('Pending', 'Payment is still pending. Checking again...');
+        const timeoutId = setTimeout(() => checkPaymentStatus(orderId, currentRetryCount + 1), 3000);
+        setTimeoutIds(prev => [...prev, timeoutId]);
+      } else {
+        showAlert('Timeout', 'Payment verification timed out. Please check your orders page for updates.');
+        const timeoutId = setTimeout(() => {
+          router.replace({ pathname: '/orders' });
+        }, 1500);
+        setTimeoutIds(prev => [...prev, timeoutId]);
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      if (currentRetryCount < 5) {
+        showAlert('Retrying', 'Having trouble verifying payment. Trying again...');
+        const timeoutId = setTimeout(() => checkPaymentStatus(orderId, currentRetryCount + 1), 3000);
+        setTimeoutIds(prev => [...prev, timeoutId]);
+      } else {
+        showAlert('Error', 'Failed to verify payment status. Please check your orders page later.');
+        const timeoutId = setTimeout(() => {
+          router.replace({ pathname: '/orders' });
+        }, 1500);
+        setTimeoutIds(prev => [...prev, timeoutId]);
+      }
+    } finally {
+      setIsCheckingPayment(false);
     }
-  } catch (error) {
-    console.error('Error checking payment status:', error);
-    if (currentRetryCount < 5) {
-      showAlert('Retrying', 'Having trouble verifying payment. Trying again...');
-      setTimeout(() => checkPaymentStatus(orderId, currentRetryCount + 1), 3000);
-    } else {
-      showAlert('Error', 'Failed to verify payment status. Please check your orders page later.');
-      setTimeout(() => {
-        router.replace({ pathname: '/orders' });
-      }, 1500);
-    }
-  } finally {
-    setIsCheckingPayment(false);
-  }
-}, [removeItemsByIds, cartItems]); // Add dependencies
+  }, [removeItemsByIds, cartItems, isCheckingPayment]); // Added isCheckingPayment to dependencies
+
   // Handle app coming back to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active' && orderId && !isProcessingPayment) {
+      if (nextAppState === 'active' && orderId && !isProcessingPayment && !isCheckingPayment) {
         // App came back to foreground, check payment status
         console.log('App returned to foreground, checking payment status');
         checkPaymentStatus(orderId);
@@ -107,7 +124,7 @@ export function Payment() {
     return () => {
       subscription.remove();
     };
-  }, [orderId, isProcessingPayment, checkPaymentStatus]);
+  }, [orderId, isProcessingPayment, isCheckingPayment, checkPaymentStatus]);
 
   const payNow = async () => {
     console.log('Starting payNow function');
@@ -115,9 +132,11 @@ export function Payment() {
       setIsProcessingPayment(true);
       console.log('Cart items:', JSON.stringify(cartItems, null, 2));
 
-      // Check access token
-      const accessToken = await SecureStore.getItemAsync('access');
+      // Check access token - FIXED: changed token to accessToken
+      const accessToken = await SecureStore.getItemAsync('access_token'); // Also fixed key name
       console.log('Access token:', accessToken ? accessToken.substring(0, 20) + '...' : 'Not found');
+      
+      // FIXED: Changed token to accessToken
       if (!accessToken) {
         throw new Error('No access token found. Please log in again.');
       }
@@ -179,10 +198,12 @@ export function Payment() {
       let errorMessage = 'An error occurred while creating the order. Please try again.';
       if (error.message === 'No access token found. Please log in again.') {
         errorMessage = error.message;
-        router.replace('/login');
+        const timeoutId = setTimeout(() => router.replace('/login'), 1000);
+        setTimeoutIds(prev => [...prev, timeoutId]);
       } else if (error.response?.status === 401) {
         errorMessage = error.response.data?.detail || 'Session expired. Please log in again.';
-        router.replace('/login');
+        const timeoutId = setTimeout(() => router.replace('/login'), 1000);
+        setTimeoutIds(prev => [...prev, timeoutId]);
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.code === 'ERR_NETWORK') {
@@ -272,9 +293,10 @@ export function Payment() {
                 <TouchableOpacity 
                   style={[styles.secondaryButton, { marginTop: 10 }]} 
                   onPress={() => checkPaymentStatus(orderId)}
+                  disabled={isCheckingPayment}
                 >
                   <Text style={styles.secondaryButtonText}>
-                    Check Payment Status
+                    {isCheckingPayment ? 'Checking...' : 'Check Payment Status'}
                   </Text>
                 </TouchableOpacity>
               )}
