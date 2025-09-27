@@ -1,22 +1,52 @@
 {
-    "build": {
-      "preview": {
-        "android": {
-          "buildType": "apk"
-        }
+  "build": {
+    "preview": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       },
-      "preview2": {
-        "android": {
-          "gradleCommand": ":app:assembleRelease"
-        }
+      "ios": {
+        "simulator": true
+      }
+    },
+    "internal": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
-      "preview3": {
-        "developmentClient": true
-      },
-      "preview4": {
-        "distribution": "internal"
-      },
-      "production": {}
+      "ios": {
+        "resourceClass": "m-medium",
+        "appleTeamId": " Z8R44237W5",
+        "simulator": false,
+        "enterpriseProvisioning": "universal"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "ios": {
+        "resourceClass": "m-medium",
+        "appleTeamId": " Z8R44237W5",
+        "simulator": false
+      }
+    }
+  },
+  "submit": {
+    "internal": {
+      "ios": {
+        "appleId": "exper.b.tech@gmail.com",
+        "ascAppId": "6752880752",
+        "appleTeamId": "Z8R44237W5"
+      }
+    },
+    "production": {
+      "ios": {
+        "appleId": "exper.b.tech@gmail.com",
+        "ascAppId": "6752880752",
+        "appleTeamId": "Z8R44237W5"
+      }
     }
   }
-  
+}

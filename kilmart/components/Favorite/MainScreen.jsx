@@ -227,7 +227,6 @@ export default function FavoritesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Favorites</Text>
         <Text style={styles.headerSubtitle}>
           {favorites.length} {favorites.length === 1 ? 'item' : 'items'}
         </Text>

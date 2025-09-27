@@ -8,8 +8,25 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9f7c3a78-1675-4f17-b4d0-345dbd1fd4c4",
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.expertech.kwirkmart",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby stores and delivery options.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photos to allow you to upload profile pictures.",
+        "NSCameraUsageDescription": "This app uses the camera to scan barcodes and take profile pictures."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,6 +34,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "dev.expertech.kwirkmart",
+      "versionCode": 1,
       "intentFilters": [
         {
           "action": "VIEW",
@@ -30,6 +48,13 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -48,7 +73,15 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "13.0"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
