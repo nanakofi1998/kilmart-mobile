@@ -56,7 +56,7 @@ export default function FavoritesScreen() {
     if (event) event.stopPropagation();
     
     try {
-      await apiClient.delete(`api/favourites/${favoriteId}/`);
+      await apiClient.delete(`api/favourites/remove/${favoriteId}/`);
       showAlert('Success', 'Product removed from favorites!');
       setFavorites(prev => prev.filter(item => item.id !== favoriteId));
     } catch (error) {
@@ -94,7 +94,7 @@ export default function FavoritesScreen() {
           productId: product.product.id,
           productName: product.product.name,
           productPrice: product.product.price,
-          productImage: product.product.image,
+          productImage: product.product.product_image, // Updated field name
           productDescription: product.product.description
         }
       });
@@ -102,7 +102,8 @@ export default function FavoritesScreen() {
   };
 
   const handleQuantityChange = (amount) => {
-    const maxQty = selectedProduct?.product?.stock || 0;
+    // Use available_stock instead of stock
+    const maxQty = selectedProduct?.product?.available_stock || 0;
     const newQty = Math.max(1, Math.min(quantity + amount, maxQty));
     setQuantity(newQty);
   };
@@ -116,13 +117,14 @@ export default function FavoritesScreen() {
     try {
       const product = selectedProduct.product;
       
-      if (product.stock === 0) {
+      // Use available_stock instead of stock
+      if (product.available_stock === 0) {
         showAlert('Unavailable', 'This product is out of stock.');
         return;
       }
 
-      if (quantity > product.stock) {
-        showAlert('Out of Stock', `Only ${product.stock} available`);
+      if (quantity > product.available_stock) {
+        showAlert('Out of Stock', `Only ${product.available_stock} available`);
         return;
       }
 
@@ -156,7 +158,7 @@ export default function FavoritesScreen() {
       activeOpacity={0.7}
     >
       <Image 
-        source={{ uri: item.product?.image || 'https://via.placeholder.com/100' }} 
+        source={{ uri: item.product?.product_image || 'https://via.placeholder.com/100' }} // Updated field name
         style={styles.productImage}
         defaultSource={require('../../assets/images/kwikmart.png')}
       />
@@ -168,26 +170,19 @@ export default function FavoritesScreen() {
         <Text style={styles.productPrice}>
           GH₵{item.product?.price ? parseFloat(item.product.price).toFixed(2) : '0.00'}
         </Text>
-        {item.product?.in_stock !== undefined && (
+        
+        {/* Updated to use available_stock */}
+        {item.product?.available_stock !== undefined && (
           <Text style={[
             styles.stockStatus,
-            { color: item.product.in_stock ? '#4CAF50' : '#F44336' }
+            { color: item.product.available_stock > 0 ? '#4CAF50' : '#F44336' }
           ]}>
-            {item.product.in_stock ? 'In Stock' : 'Out of Stock'}
+            {item.product.available_stock > 0 ? 'In Stock' : 'Out of Stock'}
           </Text>
         )}
         
         {/* Quick Action Buttons */}
         <View style={styles.quickActions}>
-          {/* <TouchableOpacity 
-            style={styles.viewButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleViewProduct(item);
-            }}
-          >
-            <Text style={styles.viewButtonText}>View Product</Text>
-          </TouchableOpacity> */}
           <Text style={styles.tapToViewText}>Tap to View</Text>
         </View>
       </View>
@@ -232,6 +227,7 @@ export default function FavoritesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Favorites</Text>
         <Text style={styles.headerSubtitle}>
           {favorites.length} {favorites.length === 1 ? 'item' : 'items'}
         </Text>
@@ -272,7 +268,7 @@ export default function FavoritesScreen() {
         >
           <View style={styles.modalContent}>
             <Image 
-              source={{ uri: selectedProduct?.product?.image }} 
+              source={{ uri: selectedProduct?.product?.product_image }} // Updated field name
               style={styles.modalImage}
               defaultSource={require('../../assets/images/kwikmart.png')}
             />
@@ -282,8 +278,9 @@ export default function FavoritesScreen() {
               GH₵{selectedProduct?.product?.price ? parseFloat(selectedProduct.product.price).toFixed(2) : '0.00'}
             </Text>
             
+            {/* Updated to use available_stock */}
             <Text style={styles.modalStock}>
-              Available: {selectedProduct?.product?.stock || 0} units
+              Available: {selectedProduct?.product?.available_stock || 0} units
             </Text>
 
             {/* Quantity Selector */}
@@ -306,10 +303,10 @@ export default function FavoritesScreen() {
 
                 <TouchableOpacity
                   style={[styles.quantityButton, { 
-                    opacity: quantity >= (selectedProduct?.product?.stock || 0) ? 0.4 : 1 
+                    opacity: quantity >= (selectedProduct?.product?.available_stock || 0) ? 0.4 : 1 
                   }]}
                   onPress={() => handleQuantityChange(1)}
-                  disabled={quantity >= (selectedProduct?.product?.stock || 0)}
+                  disabled={quantity >= (selectedProduct?.product?.available_stock || 0)}
                 >
                   <AntDesign name="plus" size={20} color="#fff" />
                 </TouchableOpacity>
@@ -328,13 +325,13 @@ export default function FavoritesScreen() {
               <TouchableOpacity 
                 style={[
                   styles.addToCartButton,
-                  { opacity: selectedProduct?.product?.stock === 0 ? 0.6 : 1 }
+                  { opacity: selectedProduct?.product?.available_stock === 0 ? 0.6 : 1 }
                 ]}
                 onPress={handleAddToCart}
-                disabled={selectedProduct?.product?.stock === 0}
+                disabled={selectedProduct?.product?.available_stock === 0}
               >
                 <Text style={styles.addToCartButtonText}>
-                  {selectedProduct?.product?.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                  {selectedProduct?.product?.available_stock === 0 ? 'Out of Stock' : 'Add to Cart'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -366,10 +363,12 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   header: {
     padding: 20,
     paddingTop: 60,
+    backgroundColor: '#f8f8f8',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -486,17 +485,6 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     marginTop: 5,
-  },
-  viewButton: {
-    backgroundColor: '#f1b811',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  viewButtonText: {
-    fontFamily: 'inter-medium',
-    fontSize: 12,
-    color: '#fff',
   },
   favoriteButton: {
     padding: 10,

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "kilmart",
-    "slug": "kilmart",
+    "name": "kwikmart",
+    "slug": "kwikmart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/kwikmart.png",
@@ -16,7 +16,7 @@
         "foregroundImage": "./assets/images/kwikmart.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.kevinlauren1998.kilmart",
+      "package": "dev.expertech.kwirkmart",
       "intentFilters": [
         {
           "action": "VIEW",
