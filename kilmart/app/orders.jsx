@@ -8,20 +8,28 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Modal,
+  Platform,
+  StatusBar
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import apiClient from '../utils/apiClient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/core';
+import apiClient from '../utils/apiClient';
 
 function Header() {
   const navigation = useNavigation();
-  console.log('Header rendering, Ionicons:', typeof Ionicons); // Debug import
+  const insets = useSafeAreaInsets();
+  
   return (
-    <View style={styles.headerContainer}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
+    <View style={[
+      styles.headerContainer,
+      { paddingTop: Platform.OS === 'ios' ? insets.top : 20 }
+    ]}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Ionicons name="chevron-back-sharp" size={24} color="black" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>My Orders</Text>
+      <View style={styles.headerPlaceholder} />
     </View>
   );
 }
@@ -35,7 +43,7 @@ export default function Orders() {
   const [modalError, setModalError] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  console.log('Orders rendering, Modal:', typeof Modal); // Debug import
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -126,10 +134,13 @@ export default function Orders() {
       activeOpacity={1}
       onPress={() => setIsModalVisible(false)}
     >
-      <View style={styles.modalContent}>
+      <View style={[
+        styles.modalContent,
+        { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+      ]}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Order Details</Text>
-          <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+          <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
             <Ionicons name="close" size={24} color="black" />
           </TouchableOpacity>
         </View>
@@ -206,7 +217,11 @@ export default function Orders() {
           data={orders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.order_id}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}
+          showsVerticalScrollIndicator={false}
         />
       )}
       <Modal
@@ -229,8 +244,9 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
     backgroundColor: '#f1b811',
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
@@ -240,15 +256,21 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5,
   },
+  backButton: {
+    padding: 5,
+  },
   headerTitle: {
     fontFamily: 'inter-bold',
-    fontSize: 15,
+    fontSize: 18,
     color: 'black',
-    marginLeft: 10,
-    alignItems: 'center',
+    textAlign: 'center',
+  },
+  headerPlaceholder: {
+    width: 34, // Same as back button for balance
   },
   listContainer: {
     padding: 20,
+    paddingTop: 10,
   },
   orderCard: {
     backgroundColor: '#fff',
@@ -382,6 +404,9 @@ const styles = StyleSheet.create({
     fontFamily: 'inter-bold',
     fontSize: 18,
     color: '#333',
+  },
+  closeButton: {
+    padding: 5,
   },
   modalOrderCard: {
     backgroundColor: '#fff',

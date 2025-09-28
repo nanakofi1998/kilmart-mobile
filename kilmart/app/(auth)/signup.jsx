@@ -7,13 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  StatusBar
 } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import AwesomeAlert from 'react-native-awesome-alerts';
 import apiClient from '../../utils/apiClient';
 
 export default function Signup() {
@@ -29,10 +30,19 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [alert, setAlert] = useState({ show: false, title: '', message: '' });
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    isSuccess: false,
+  });
 
-  const showAlert = (title, message) => {
-    setAlert({ show: true, title, message });
+  const insets = useSafeAreaInsets();
+
+  const displayAlert = (title, message, isSuccess = false) => {
+    setShowAlert(false);
+    setAlertConfig({ title, message, isSuccess });
+    setShowAlert(true);
   };
 
   const handleInputChange = (field, value) => {
@@ -46,27 +56,27 @@ export default function Signup() {
     const { email, first_name, last_name, phone_number, password, confirm_password } = formData;
 
     if (!email || !first_name || !last_name || !phone_number || !password || !confirm_password) {
-      showAlert('Error', 'Please fill in all required fields');
+      displayAlert('Error', 'Please fill in all required fields');
       return false;
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      showAlert('Error', 'Please enter a valid email address');
+      displayAlert('Error', 'Please enter a valid email address');
       return false;
     }
 
     if (!/^\d{10,}$/.test(phone_number.replace(/\D/g, ''))) {
-      showAlert('Error', 'Please enter a valid phone number (at least 10 digits)');
+      displayAlert('Error', 'Please enter a valid phone number (at least 10 digits)');
       return false;
     }
 
     if (password.length < 6) {
-      showAlert('Error', 'Password must be at least 6 characters long');
+      displayAlert('Error', 'Password must be at least 6 characters long');
       return false;
     }
 
     if (password !== confirm_password) {
-      showAlert('Error', 'Passwords do not match');
+      displayAlert('Error', 'Passwords do not match');
       return false;
     }
 
@@ -93,14 +103,15 @@ export default function Signup() {
       if (response.status === 201) {
         // Success - check if response has success property or just assume success on 201
         if (response.data.success) {
-          showAlert('Success', 'Account created successfully! Please check your email for verification code.');
+          displayAlert('Success', 'Account created successfully! Please check your email for verification code.', true);
         } else {
           // If no success property but status is 201, still treat as success
-          showAlert('Success', 'Account created successfully! Please check your email for verification code.');
+          displayAlert('Success', 'Account created successfully! Please check your email for verification code.', true);
         }
 
         // Route to OTP verification screen after a short delay
         setTimeout(() => {
+          setShowAlert(false);
           router.replace({
             pathname: '/verifyotp',
             params: {
@@ -111,7 +122,7 @@ export default function Signup() {
         }, 2000);
       } else {
         // Handle other status codes
-        showAlert('Error', response.data.message || 'Signup failed. Please try again.');
+        displayAlert('Error', response.data.message || 'Signup failed. Please try again.');
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -151,144 +162,221 @@ export default function Signup() {
         errorMessage = error.message;
       }
 
-      showAlert('Error', errorMessage);
+      displayAlert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Sign up to get started</Text>
-        </View>
-
-        <View style={styles.formContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email Address *"
-            value={formData.email}
-            onChangeText={(text) => handleInputChange('email', text)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!isLoading}
-          />
-
-          <View style={styles.nameRow}>
-            <TextInput
-              style={[styles.input, styles.nameInput]}
-              placeholder="First Name *"
-              value={formData.first_name}
-              onChangeText={(text) => handleInputChange('first_name', text)}
-              editable={!isLoading}
-            />
-            <TextInput
-              style={[styles.input, styles.nameInput]}
-              placeholder="Last Name *"
-              value={formData.last_name}
-              onChangeText={(text) => handleInputChange('last_name', text)}
-              editable={!isLoading}
-            />
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: '#fff',
+      paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+    }}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          contentContainerStyle={[
+            styles.scrollContainer,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Sign up to get started</Text>
           </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Other Names (Optional)"
-            value={formData.other_name}
-            onChangeText={(text) => handleInputChange('other_name', text)}
-            editable={!isLoading}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Phone Number *"
-            value={formData.phone_number}
-            onChangeText={(text) => handleInputChange('phone_number', text)}
-            keyboardType="phone-pad"
-            editable={!isLoading}
-          />
-
-          <View style={styles.passwordContainer}>
+          <View style={styles.formContainer}>
             <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Password *"
-              value={formData.password}
-              onChangeText={(text) => handleInputChange('password', text)}
-              secureTextEntry={!showPassword}
+              style={styles.input}
+              placeholder="Email Address *"
+              value={formData.email}
+              onChangeText={(text) => handleInputChange('email', text)}
+              keyboardType="email-address"
+              autoCapitalize="none"
               editable={!isLoading}
+              placeholderTextColor="#999"
             />
+
+            <View style={styles.nameRow}>
+              <TextInput
+                style={[styles.input, styles.nameInput]}
+                placeholder="First Name *"
+                value={formData.first_name}
+                onChangeText={(text) => handleInputChange('first_name', text)}
+                editable={!isLoading}
+                placeholderTextColor="#999"
+              />
+              <TextInput
+                style={[styles.input, styles.nameInput]}
+                placeholder="Last Name *"
+                value={formData.last_name}
+                onChangeText={(text) => handleInputChange('last_name', text)}
+                editable={!isLoading}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Other Names (Optional)"
+              value={formData.other_name}
+              onChangeText={(text) => handleInputChange('other_name', text)}
+              editable={!isLoading}
+              placeholderTextColor="#999"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Phone Number *"
+              value={formData.phone_number}
+              onChangeText={(text) => handleInputChange('phone_number', text)}
+              keyboardType="phone-pad"
+              editable={!isLoading}
+              placeholderTextColor="#999"
+            />
+
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Password *"
+                value={formData.password}
+                onChangeText={(text) => handleInputChange('password', text)}
+                secureTextEntry={!showPassword}
+                editable={!isLoading}
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <FontAwesome5
+                  name={showPassword ? 'eye' : 'eye-slash'}
+                  size={18}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Confirm Password *"
+                value={formData.confirm_password}
+                onChangeText={(text) => handleInputChange('confirm_password', text)}
+                secureTextEntry={!showConfirmPassword}
+                editable={!isLoading}
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={isLoading}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <FontAwesome5
+                  name={showConfirmPassword ? 'eye' : 'eye-slash'}
+                  size={18}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
+              style={[styles.signupButton, isLoading && styles.signupButtonDisabled]}
+              onPress={handleSignup}
               disabled={isLoading}
             >
-              <FontAwesome5
-                name={showPassword ? 'eye' : 'eye-slash'}
-                size={18}
-                color="#666"
-              />
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.signupButtonText}>Create Account</Text>
+              )}
             </TouchableOpacity>
+
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => router.replace('/login')} disabled={isLoading}>
+                <Text style={styles.loginLink}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Confirm Password *"
-              value={formData.confirm_password}
-              onChangeText={(text) => handleInputChange('confirm_password', text)}
-              secureTextEntry={!showConfirmPassword}
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              disabled={isLoading}
-            >
-              <FontAwesome5
-                name={showConfirmPassword ? 'eye' : 'eye-slash'}
-                size={18}
-                color="#666"
-              />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.signupButton, isLoading && styles.signupButtonDisabled]}
-            onPress={handleSignup}
-            disabled={isLoading}
+          {/* Custom Alert Modal */}
+          <Modal
+            visible={showAlert}
+            transparent
+            animationType="fade"
+            onRequestClose={() => !alertConfig.isSuccess && setShowAlert(false)}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.signupButtonText}>Create Account</Text>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => router.replace('/login')} disabled={isLoading}>
-              <Text style={styles.loginLink}>Sign In</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <AwesomeAlert
-          show={alert.show}
-          title={alert.title}
-          message={alert.message}
-          closeOnTouchOutside={true}
-          showConfirmButton={true}
-          confirmText="Okay"
-          confirmButtonColor="#333"
-          onConfirmPressed={() => setAlert({ ...alert, show: false })}
-        />
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <View style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            }}>
+              <View style={{
+                backgroundColor: 'white',
+                padding: 20,
+                borderRadius: 12,
+                minWidth: 280,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
+              }}>
+                <Text style={{
+                  fontFamily: 'inter-bold',
+                  fontSize: 18,
+                  color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
+                  marginBottom: 10,
+                  textAlign: 'center',
+                }}>
+                  {alertConfig.title}
+                </Text>
+                <Text style={{
+                  fontFamily: 'inter-regular',
+                  fontSize: 14,
+                  textAlign: 'center',
+                  marginBottom: 20,
+                  color: '#333',
+                  lineHeight: 20,
+                }}>
+                  {alertConfig.message}
+                </Text>
+                {!alertConfig.isSuccess && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#D32F2F',
+                      padding: 12,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => setShowAlert(false)}
+                  >
+                    <Text style={{
+                      color: 'white',
+                      fontFamily: 'inter-medium',
+                      fontSize: 16,
+                    }}>
+                      OK
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </Modal>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -300,7 +388,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 40,
   },
   header: {
     alignItems: 'center',
@@ -329,6 +417,7 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1,
     borderColor: '#eee',
+    fontFamily: 'inter-regular',
   },
   nameRow: {
     flexDirection: 'row',
@@ -358,6 +447,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   signupButtonDisabled: {
     opacity: 0.7,

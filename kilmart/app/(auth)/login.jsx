@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  Image, 
+  TouchableOpacity, 
+  ScrollView, 
+  ActivityIndicator,
+  Platform,
+  StatusBar,
+  Modal
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiClient from '../../utils/apiClient';
 import * as SecureStore from 'expo-secure-store';
-import AwesomeAlert from 'react-native-awesome-alerts';
 import AuthInput from '../../components/AuthInput';
 
 export default function LoginScreen() {
@@ -18,6 +28,7 @@ export default function LoginScreen() {
   });
 
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const displayAlert = (title, message, isSuccess = false, redirectPath = null) => {
     setShowAlert(false);
@@ -147,179 +158,232 @@ export default function LoginScreen() {
   };
 
   return (
-    <ScrollView 
-      style={{ flex: 1, backgroundColor: '#fff' }}
-      contentContainerStyle={{ flexGrow: 1 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Image
-        source={require('./../../assets/images/bnr.png')}
-        style={{
-          width: '100%',
-          height: 200,
-          borderBottomLeftRadius: 10,
-          borderBottomRightRadius: 10,
-        }}
-        resizeMode="cover"
-      />
-
-      <View style={{ padding: 20, flex: 1 }}>
-        <Text
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: '#fff',
+      paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+    }}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Image
+          source={require('./../../assets/images/bnr.png')}
           style={{
-            fontSize: 28,
-            fontFamily: 'inter-bold',
-            marginBottom: 20,
-            color: '#333',
+            width: '100%',
+            height: 200,
+            borderBottomLeftRadius: 10,
+            borderBottomRightRadius: 10,
           }}
-        >
-          Login
-        </Text>
-
-        <AuthInput
-          placeholder="Email address"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="email"
-          editable={!loading}
-        />
-        
-        <AuthInput
-          placeholder="Password"
-          secure
-          value={password}
-          onChangeText={setPassword}
-          autoCapitalize="none"
-          autoComplete="password"
-          editable={!loading}
+          resizeMode="cover"
         />
 
-        <TouchableOpacity
-          style={{ alignSelf: 'flex-end', marginVertical: 10 }}
-          onPress={handleForgotPassword}
-          disabled={loading}
-        >
-          <Text style={{ 
-            color: '#f1b811', 
-            fontFamily: 'inter-medium',
-            opacity: loading ? 0.5 : 1 
-          }}>
-            Forgot password?
+        <View style={{ 
+          padding: 20, 
+          flex: 1,
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 
+        }}>
+          <Text
+            style={{
+              fontSize: 28,
+              fontFamily: 'inter-bold',
+              marginBottom: 20,
+              color: '#333',
+            }}
+          >
+            Login
           </Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#f1b811',
-            padding: 16,
-            borderRadius: 12,
-            marginVertical: 20,
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            opacity: loading ? 0.7 : 1,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 3,
-            elevation: 3,
-          }}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
+          <AuthInput
+            placeholder="Email address"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            editable={!loading}
+            iconName="mail-outline"
+          />
+          
+          <AuthInput
+            placeholder="Password"
+            secure
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+            autoComplete="password"
+            editable={!loading}
+            iconName="lock-closed-outline"
+          />
+
+          <TouchableOpacity
+            style={{ alignSelf: 'flex-end', marginVertical: 10 }}
+            onPress={handleForgotPassword}
+            disabled={loading}
+          >
+            <Text style={{ 
+              color: '#f1b811', 
+              fontFamily: 'inter-medium',
+              opacity: loading ? 0.5 : 1 
+            }}>
+              Forgot password?
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#f1b811',
+              padding: 16,
+              borderRadius: 12,
+              marginVertical: 20,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              opacity: loading ? 0.7 : 1,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+              elevation: 3,
+            }}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text
+                style={{
+                  textAlign: 'center',
+                  color: '#fff',
+                  fontFamily: 'inter-bold',
+                  fontSize: 16,
+                }}
+              >
+                Login
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={{ alignItems: 'center', marginVertical: 10 }}>
             <Text
               style={{
                 textAlign: 'center',
-                color: '#fff',
+                fontFamily: 'inter-medium',
+                fontStyle: 'italic',
+                color: '#666',
+              }}
+            >
+              Don't have an account?
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#000000ff',
+              padding: 16,
+              borderRadius: 12,
+              marginVertical: 10,
+              opacity: loading ? 0.7 : 1,
+            }}
+            onPress={handleSignUp}
+            disabled={loading}
+          >
+            <Text
+              style={{
+                textAlign: 'center',
+                color: '#ffffffff',
                 fontFamily: 'inter-bold',
                 fontSize: 16,
               }}
             >
-              Login
+              Sign up
             </Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <View style={{ alignItems: 'center', marginVertical: 10 }}>
-          <Text
-            style={{
-              textAlign: 'center',
-              fontFamily: 'inter-medium',
-              fontStyle: 'italic',
+          {/* Custom Alert Modal */}
+          <Modal
+            visible={showAlert}
+            transparent
+            animationType="fade"
+            onRequestClose={() => !alertConfig.isSuccess && setShowAlert(false)}
+          >
+            <View style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            }}>
+              <View style={{
+                backgroundColor: 'white',
+                padding: 20,
+                borderRadius: 12,
+                minWidth: 280,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
+              }}>
+                <Text style={{
+                  fontFamily: 'inter-bold',
+                  fontSize: 18,
+                  color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
+                  marginBottom: 10,
+                  textAlign: 'center',
+                }}>
+                  {alertConfig.title}
+                </Text>
+                <Text style={{
+                  fontFamily: 'inter-regular',
+                  fontSize: 14,
+                  textAlign: 'center',
+                  marginBottom: 20,
+                  color: '#333',
+                  lineHeight: 20,
+                }}>
+                  {alertConfig.message}
+                </Text>
+                {!alertConfig.isSuccess && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#D32F2F',
+                      padding: 12,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => setShowAlert(false)}
+                  >
+                    <Text style={{
+                      color: 'white',
+                      fontFamily: 'inter-medium',
+                      fontSize: 16,
+                    }}>
+                      OK
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </Modal>
+
+          <View style={{ marginTop: 'auto', paddingTop: 20 }}>
+            <Text style={{ 
+              textAlign: 'center', 
+              fontSize: 12, 
+              fontFamily: 'inter-regular',
               color: '#666',
-            }}
-          >
-            Don't have an account?
-          </Text>
+              lineHeight: 16,
+            }}>
+              By clicking login you agree to our{' '}
+              <Text style={{ color: '#f1b811' }}>Terms of use</Text> and{' '}
+              <Text style={{ color: '#f1b811' }}>Privacy policy</Text>
+            </Text>
+          </View>
         </View>
-
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#b0b8ba',
-            padding: 16,
-            borderRadius: 12,
-            marginVertical: 10,
-            opacity: loading ? 0.7 : 1,
-          }}
-          onPress={handleSignUp}
-          disabled={loading}
-        >
-          <Text
-            style={{
-              textAlign: 'center',
-              color: '#000',
-              fontFamily: 'inter-bold',
-              fontSize: 16,
-            }}
-          >
-            Sign up
-          </Text>
-        </TouchableOpacity>
-
-        <AwesomeAlert
-          show={showAlert}
-          showProgress={false}
-          title={alertConfig.title}
-          titleStyle={{
-            fontFamily: 'inter-bold',
-            fontSize: 18,
-            color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
-          }}
-          message={alertConfig.message}
-          messageStyle={{
-            fontFamily: 'inter-regular',
-            fontSize: 14,
-            textAlign: 'center',
-          }}
-          closeOnTouchOutside={!alertConfig.isSuccess}
-          closeOnHardwareBackPress={false}
-          showConfirmButton={!alertConfig.isSuccess}
-          confirmText="OK"
-          confirmButtonColor={alertConfig.isSuccess ? '#4CAF50' : '#D32F2F'}
-          confirmButtonStyle={{ paddingHorizontal: 20 }}
-          confirmButtonTextStyle={{ fontFamily: 'inter-medium' }}
-          onConfirmPressed={() => setShowAlert(false)}
-          onDismiss={() => setShowAlert(false)}
-        />
-
-        <View style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <Text style={{ 
-            textAlign: 'center', 
-            fontSize: 12, 
-            fontFamily: 'inter-regular',
-            color: '#666',
-            lineHeight: 16,
-          }}>
-            By clicking login you agree to our{' '}
-            <Text style={{ color: '#f1b811' }}>Terms of use</Text> and{' '}
-            <Text style={{ color: '#f1b811' }}>Privacy policy</Text>
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

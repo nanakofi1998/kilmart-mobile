@@ -10,11 +10,14 @@ import {
   RefreshControl,
   Alert,
   Modal,
-  TextInput
+  TextInput,
+  Platform,
+  StatusBar
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { AntDesign } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiClient from '../../utils/apiClient';
 import AwesomeAlert from 'react-native-awesome-alerts';
 import { useCart } from '../../context/CartContext';
@@ -29,6 +32,7 @@ export default function FavoritesScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const router = useRouter();
   const { addToCart } = useCart();
+  const insets = useSafeAreaInsets();
 
   const showAlert = (title, message) => {
     setAlert({ show: true, title, message });
@@ -94,7 +98,7 @@ export default function FavoritesScreen() {
           productId: product.product.id,
           productName: product.product.name,
           productPrice: product.product.price,
-          productImage: product.product.product_image, // Updated field name
+          productImage: product.product.product_image,
           productDescription: product.product.description
         }
       });
@@ -102,7 +106,6 @@ export default function FavoritesScreen() {
   };
 
   const handleQuantityChange = (amount) => {
-    // Use available_stock instead of stock
     const maxQty = selectedProduct?.product?.available_stock || 0;
     const newQty = Math.max(1, Math.min(quantity + amount, maxQty));
     setQuantity(newQty);
@@ -117,7 +120,6 @@ export default function FavoritesScreen() {
     try {
       const product = selectedProduct.product;
       
-      // Use available_stock instead of stock
       if (product.available_stock === 0) {
         showAlert('Unavailable', 'This product is out of stock.');
         return;
@@ -145,6 +147,10 @@ export default function FavoritesScreen() {
     fetchFavorites();
   };
 
+  const handleBack = () => {
+    router.back();
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchFavorites();
@@ -158,7 +164,7 @@ export default function FavoritesScreen() {
       activeOpacity={0.7}
     >
       <Image 
-        source={{ uri: item.product?.product_image || 'https://via.placeholder.com/100' }} // Updated field name
+        source={{ uri: item.product?.product_image || 'https://via.placeholder.com/100' }}
         style={styles.productImage}
         defaultSource={require('../../assets/images/kwikmart.png')}
       />
@@ -171,7 +177,6 @@ export default function FavoritesScreen() {
           GH₵{item.product?.price ? parseFloat(item.product.price).toFixed(2) : '0.00'}
         </Text>
         
-        {/* Updated to use available_stock */}
         {item.product?.available_stock !== undefined && (
           <Text style={[
             styles.stockStatus,
@@ -181,7 +186,6 @@ export default function FavoritesScreen() {
           </Text>
         )}
         
-        {/* Quick Action Buttons */}
         <View style={styles.quickActions}>
           <Text style={styles.tapToViewText}>Tap to View</Text>
         </View>
@@ -217,7 +221,10 @@ export default function FavoritesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[
+        styles.loadingContainer,
+        { paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight }
+      ]}>
         <ActivityIndicator size="large" color="#000" />
         <Text style={styles.loadingText}>Loading your favorites...</Text>
       </View>
@@ -225,7 +232,15 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container,
+      { paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight }
+    ]}>
+      {/* Header with Back Button */}
+      <View style={styles.header}>
+        <View style={styles.headerPlaceholder} />
+      </View>
+
       <View style={styles.header}>
         <Text style={styles.headerSubtitle}>
           {favorites.length} {favorites.length === 1 ? 'item' : 'items'}
@@ -239,7 +254,10 @@ export default function FavoritesScreen() {
           data={favorites}
           renderItem={renderProductItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -265,9 +283,12 @@ export default function FavoritesScreen() {
           activeOpacity={1} 
           onPress={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={[
+            styles.modalContent,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}>
             <Image 
-              source={{ uri: selectedProduct?.product?.product_image }} // Updated field name
+              source={{ uri: selectedProduct?.product?.product_image }}
               style={styles.modalImage}
               defaultSource={require('../../assets/images/kwikmart.png')}
             />
@@ -277,12 +298,10 @@ export default function FavoritesScreen() {
               GH₵{selectedProduct?.product?.price ? parseFloat(selectedProduct.product.price).toFixed(2) : '0.00'}
             </Text>
             
-            {/* Updated to use available_stock */}
             <Text style={styles.modalStock}>
               Available: {selectedProduct?.product?.available_stock || 0} units
             </Text>
 
-            {/* Quantity Selector */}
             <View style={styles.quantityContainer}>
               <Text style={styles.quantityLabel}>Quantity:</Text>
               <View style={styles.quantityControls}>
@@ -312,7 +331,6 @@ export default function FavoritesScreen() {
               </View>
             </View>
 
-            {/* Action Buttons */}
             <View style={styles.modalActions}>
               <TouchableOpacity 
                 style={styles.viewDetailButton}
@@ -362,20 +380,27 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    // backgroundColor: '#fff',
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#f8f8f8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  backButton: {
+    padding: 5,
+  },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 18,
     fontFamily: 'inter-bold',
     color: '#333',
-    marginBottom: 5,
+  },
+  headerPlaceholder: {
+    width: 34,
   },
   headerSubtitle: {
     fontSize: 16,

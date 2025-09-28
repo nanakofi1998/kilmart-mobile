@@ -1,9 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch, ActivityIndicator, AppState, Alert, Modal, FlatList } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  TextInput, 
+  ScrollView, 
+  ActivityIndicator, 
+  AppState, 
+  Alert, 
+  Modal, 
+  FlatList,
+  Platform,
+  StatusBar
+} from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import AwesomeAlert from 'react-native-awesome-alerts';
 import { useLocalSearchParams, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
 import { useCart } from '../context/CartContext';
@@ -15,6 +29,7 @@ WebBrowser.maybeCompleteAuthSession();
 export function Payment() {
   const { cartItems: cartItemsString, totalPrice } = useLocalSearchParams();
   const cartItems = JSON.parse(cartItemsString || '[]');
+  const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -22,7 +37,6 @@ export function Payment() {
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [useDefaultAddress, setUseDefaultAddress] = useState(false);
   const [isDeliveryDetailsComplete, setIsDeliveryDetailsComplete] = useState(false);
-  const [alert, setAlert] = useState({ show: false, title: '', message: '' });
   const [paymentReference, setPaymentReference] = useState('');
   const [orderId, setOrderId] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -32,6 +46,12 @@ export function Payment() {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    isSuccess: false,
+  });
 
   // New address form fields
   const [newAddress, setNewAddress] = useState({
@@ -44,8 +64,10 @@ export function Payment() {
     contact_phone: ''
   });
 
-  const showAlert = (title, message) => {
-    setAlert({ show: true, title, message });
+  const displayAlert = (title, message, isSuccess = false) => {
+    setShowAlert(false);
+    setAlertConfig({ title, message, isSuccess });
+    setShowAlert(true);
   };
 
   const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
@@ -67,7 +89,7 @@ export function Payment() {
       }
     } catch (error) {
       console.error('Error fetching shipping addresses:', error);
-      showAlert('Error', 'Failed to load saved addresses');
+      displayAlert('Error', 'Failed to load saved addresses');
     } finally {
       setIsLoadingAddresses(false);
     }
@@ -77,7 +99,7 @@ export function Payment() {
   const saveNewAddress = async (setAsDefault = false) => {
     try {
       if (!newAddress.address_line_1 || !newAddress.city || !newAddress.contact_phone) {
-        showAlert('Error', 'Please fill in required fields (Address, City, Phone)');
+        displayAlert('Error', 'Please fill in required fields (Address, City, Phone)');
         return;
       }
 
@@ -88,7 +110,7 @@ export function Payment() {
 
       const response = await apiClient.post('api/auth/shipping-address/', payload);
       
-      showAlert('Success', 'Address saved successfully!');
+      displayAlert('Success', 'Address saved successfully!', true);
       await fetchShippingAddresses(); // Refresh addresses
       setSelectedAddressId(response.data.id);
       setIsAddingNewAddress(false);
@@ -103,26 +125,26 @@ export function Payment() {
       });
     } catch (error) {
       console.error('Error saving address:', error);
-      showAlert('Error', 'Failed to save address. Please try again.');
+      displayAlert('Error', 'Failed to save address. Please try again.');
     }
   };
 
   const handleConfirmDetails = () => {
     if (!email) {
-      showAlert('Error', 'Please enter your email address');
+      displayAlert('Error', 'Please enter your email address');
       return;
     }
     if (!validateEmail(email)) {
-      showAlert('Error', 'Please enter a valid email address');
+      displayAlert('Error', 'Please enter a valid email address');
       return;
     }
     if (!useDefaultAddress && !selectedAddressId) {
-      showAlert('Error', 'Please select a shipping address or use your default address');
+      displayAlert('Error', 'Please select a shipping address or use your default address');
       return;
     }
 
     setIsDeliveryDetailsComplete(true);
-    showAlert('Success', 'Delivery details confirmed!');
+    displayAlert('Success', 'Delivery details confirmed!', true);
   };
 
   // Clear all timeouts on component unmount
@@ -150,19 +172,21 @@ export function Payment() {
         const paidItemIds = cartItems.map(item => item.id);
         await removeItemsByIds(paidItemIds);
         
-        showAlert('Success', 'Payment completed successfully! Redirecting to orders...');
+        displayAlert('Success', 'Payment completed successfully! Redirecting to orders...', true);
         const timeoutId = setTimeout(() => {
+          setShowAlert(false);
           router.replace({ pathname: '/orders', params: { newOrderId: orderId } });
         }, 1500);
         setTimeoutIds(prev => [...prev, timeoutId]);
         return true;
       } else if (currentRetryCount < 8) {
-        showAlert('Pending', 'Payment is still pending. Checking again...');
+        displayAlert('Pending', 'Payment is still pending. Checking again...');
         const timeoutId = setTimeout(() => checkPaymentStatus(orderId, currentRetryCount + 1), 3000);
         setTimeoutIds(prev => [...prev, timeoutId]);
       } else {
-        showAlert('Timeout', 'Payment verification timed out. Please check your orders page for updates.');
+        displayAlert('Timeout', 'Payment verification timed out. Please check your orders page for updates.');
         const timeoutId = setTimeout(() => {
+          setShowAlert(false);
           router.replace({ pathname: '/orders' });
         }, 1500);
         setTimeoutIds(prev => [...prev, timeoutId]);
@@ -170,12 +194,13 @@ export function Payment() {
     } catch (error) {
       console.error('Error checking payment status:', error);
       if (currentRetryCount < 5) {
-        showAlert('Retrying', 'Having trouble verifying payment. Trying again...');
+        displayAlert('Retrying', 'Having trouble verifying payment. Trying again...');
         const timeoutId = setTimeout(() => checkPaymentStatus(orderId, currentRetryCount + 1), 3000);
         setTimeoutIds(prev => [...prev, timeoutId]);
       } else {
-        showAlert('Error', 'Failed to verify payment status. Please check your orders page later.');
+        displayAlert('Error', 'Failed to verify payment status. Please check your orders page later.');
         const timeoutId = setTimeout(() => {
+          setShowAlert(false);
           router.replace({ pathname: '/orders' });
         }, 1500);
         setTimeoutIds(prev => [...prev, timeoutId]);
@@ -250,7 +275,7 @@ export function Payment() {
       setPaymentReference(payment_info.reference);
       setOrderId(order_id);
       
-      showAlert('Info', 'Complete the payment in the browser, then return to the app. We will automatically verify your payment.');
+      displayAlert('Info', 'Complete the payment in the browser, then return to the app. We will automatically verify your payment.');
       
       const result = await WebBrowser.openBrowserAsync(payment_info.authorization_url, {
         toolbarColor: '#000000',
@@ -281,7 +306,7 @@ export function Payment() {
         errorMessage = error.response.data.detail;
       }
       
-      showAlert('Error', errorMessage);
+      displayAlert('Error', errorMessage);
     } finally {
       setIsProcessingPayment(false);
     }
@@ -319,7 +344,10 @@ export function Payment() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container,
+      { paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight }
+    ]}>
       {isProcessingPayment || isCheckingPayment ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#000" />
@@ -331,7 +359,14 @@ export function Payment() {
           )}
         </View>
       ) : (
-        <ScrollView style={styles.scrollContainer}>
+        <ScrollView 
+          style={styles.scrollContainer}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.sectionTitle}>
             Delivery Details <FontAwesome5 name="shipping-fast" size={22} />
           </Text>
@@ -344,6 +379,7 @@ export function Payment() {
             editable={!isDeliveryDetailsComplete}
             keyboardType="email-address"
             autoCapitalize="none"
+            placeholderTextColor="#999"
           />
 
           {/* Address Selection */}
@@ -433,7 +469,10 @@ export function Payment() {
             onRequestClose={() => setShowAddressModal(false)}
           >
             <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
+              <View style={[
+                styles.modalContent,
+                { marginBottom: Platform.OS === 'ios' ? insets.bottom : 0 }
+              ]}>
                 <Text style={styles.modalTitle}>
                   {isAddingNewAddress ? 'Add New Address' : 'Select Address'}
                 </Text>
@@ -445,36 +484,42 @@ export function Payment() {
                       placeholder="Address Line 1 *"
                       value={newAddress.address_line_1}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, address_line_1: text }))}
+                      placeholderTextColor="#999"
                     />
                     <TextInput
                       style={styles.input}
                       placeholder="Address Line 2 (Optional)"
                       value={newAddress.address_line_2}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, address_line_2: text }))}
+                      placeholderTextColor="#999"
                     />
                     <TextInput
                       style={styles.input}
                       placeholder="City *"
                       value={newAddress.city}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, city: text }))}
+                      placeholderTextColor="#999"
                     />
                     <TextInput
                       style={styles.input}
                       placeholder="State/Region *"
                       value={newAddress.state_province_region}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, state_province_region: text }))}
+                      placeholderTextColor="#999"
                     />
                     <TextInput
                       style={styles.input}
                       placeholder="Postal Code"
                       value={newAddress.postal_code}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, postal_code: text }))}
+                      placeholderTextColor="#999"
                     />
                     <TextInput
                       style={styles.input}
                       placeholder="Country"
                       value={newAddress.country}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, country: text }))}
+                      placeholderTextColor="#999"
                     />
                     <TextInput
                       style={styles.input}
@@ -482,6 +527,7 @@ export function Payment() {
                       value={newAddress.contact_phone}
                       onChangeText={(text) => setNewAddress(prev => ({ ...prev, contact_phone: text }))}
                       keyboardType="phone-pad"
+                      placeholderTextColor="#999"
                     />
 
                     <View style={styles.modalActions}>
@@ -532,16 +578,36 @@ export function Payment() {
             </View>
           </Modal>
 
-          <AwesomeAlert
-            show={alert.show}
-            title={alert.title}
-            message={alert.message}
-            closeOnTouchOutside={true}
-            showConfirmButton={true}
-            confirmText="Okay"
-            confirmButtonColor="#333"
-            onConfirmPressed={() => setAlert({ ...alert, show: false })}
-          />
+          {/* Custom Alert Modal */}
+          <Modal
+            visible={showAlert}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowAlert(false)}
+          >
+            <View style={styles.alertOverlay}>
+              <View style={styles.alertContent}>
+                <Text style={[
+                  styles.alertTitle,
+                  { color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F' }
+                ]}>
+                  {alertConfig.title}
+                </Text>
+                <Text style={styles.alertMessage}>
+                  {alertConfig.message}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.alertButton,
+                    { backgroundColor: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F' }
+                  ]}
+                  onPress={() => setShowAlert(false)}
+                >
+                  <Text style={styles.alertButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       )}
     </View>
@@ -549,8 +615,16 @@ export function Payment() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollContainer: { flex: 1, padding: 20, paddingTop: 60 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#fff' 
+  },
+  scrollContainer: { 
+    flex: 1 
+  },
+  scrollContent: { 
+    padding: 20 
+  },
   loadingContainer: { 
     flex: 1, 
     justifyContent: 'center', 
@@ -561,19 +635,21 @@ const styles = StyleSheet.create({
     marginTop: 10, 
     fontSize: 16, 
     color: '#333',
-    textAlign: 'center'
+    textAlign: 'center',
+    fontFamily: 'inter-medium'
   },
   loadingSubtext: {
     marginTop: 5,
     fontSize: 14,
     color: '#666',
-    textAlign: 'center'
+    textAlign: 'center',
+    fontFamily: 'inter-regular'
   },
   sectionTitle: { 
     fontSize: 24, 
     fontFamily: 'inter-bold', 
     marginBottom: 15, 
-    marginTop: 20, 
+    marginTop: 10, 
     color: '#333' 
   },
   subSectionTitle: {
@@ -590,7 +666,8 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     color: '#333',
     borderWidth: 1,
-    borderColor: '#eee'
+    borderColor: '#eee',
+    fontFamily: 'inter-regular'
   },
   addressSection: {
     marginBottom: 20,
@@ -664,6 +741,7 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     marginVertical: 10,
+    fontFamily: 'inter-regular'
   },
   addAddressButton: {
     flexDirection: 'row',
@@ -760,8 +838,8 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    padding: 5,
-    borderRadius: 50,
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
   cancelButton: {
@@ -769,11 +847,9 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#666',
-    fontSize: 10,
   },
   saveDefaultButton: {
     backgroundColor: '#f1b811',
-    borderColor: '#000000ff',
   },
   cancelButtonText: {
     color: '#333',
@@ -786,10 +862,52 @@ const styles = StyleSheet.create({
   saveDefaultButtonText: {
     color: '#fff',
     fontFamily: 'inter-bold',
-    fontSize: 10,
   },
   loadingAddresses: {
     marginVertical: 10,
+  },
+  // Alert Styles
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  alertContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    minWidth: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  alertTitle: {
+    fontFamily: 'inter-bold',
+    fontSize: 18,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  alertMessage: {
+    fontFamily: 'inter-regular',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
+    lineHeight: 20,
+  },
+  alertButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  alertButtonText: {
+    color: 'white',
+    fontFamily: 'inter-medium',
+    fontSize: 16,
   },
 });
 

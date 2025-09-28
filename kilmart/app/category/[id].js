@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ScrollView,
-  Modal, TextInput, ActivityIndicator, Dimensions, Alert
+  Modal, TextInput, ActivityIndicator, Dimensions, Alert, Platform,
+  StatusBar
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiClient from '../../utils/apiClient';
 import { useCart } from '../../context/CartContext'
 
@@ -16,6 +18,7 @@ export default function CategoryScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { addToCart } = useCart();
+  const insets = useSafeAreaInsets();
 
   const [state, setState] = useState({
     categories: [],
@@ -323,28 +326,47 @@ export default function CategoryScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ 
+      flex: 1,
+      backgroundColor: '#fff',
+      paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+    }}>
       {/* Tabs */}
       <View style={styles.tabContainer}>
-        <ScrollView horizontal ref={mainScrollViewRef} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mainTabBarContainer}>
+        <ScrollView 
+          horizontal 
+          ref={mainScrollViewRef} 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.mainTabBarContainer}
+        >
           {state.categories.map(category => renderTab(category))}
         </ScrollView>
 
-        <ScrollView horizontal ref={subScrollViewRef} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subTabBarContainer}>
+        <ScrollView 
+          horizontal 
+          ref={subScrollViewRef} 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.subTabBarContainer}
+        >
           {state.subCategories.map(subCategory => renderTab(subCategory, false))}
         </ScrollView>
       </View>
 
       {/* Products */}
       {state.loading.items ? (
-        <ActivityIndicator size="large" color="#333" style={{ marginTop: 20 }} />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#333" />
+        </View>
       ) : (
         <FlatList
           data={state.items}
           renderItem={renderProductItem}
           keyExtractor={item => item.id.toString()}
           numColumns={numColumns}
-          contentContainerStyle={{ paddingBottom: 50 }}
+          contentContainerStyle={[
+            styles.itemsContainer,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}
         />
       )}
 
@@ -355,8 +377,15 @@ export default function CategoryScreen() {
         transparent
         onRequestClose={() => setState(prev => ({ ...prev, isModalVisible: false }))}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setState(prev => ({ ...prev, isModalVisible: false }))}>
-          <View style={styles.modalContent}>
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setState(prev => ({ ...prev, isModalVisible: false }))}
+        >
+          <View style={[
+            styles.modalContent,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+          ]}>
             <View style={styles.modalImageContainer}>
               <Image source={{ uri: state.selectedItem?.product_image }} style={styles.modalImage} />
               <TouchableOpacity 
@@ -468,9 +497,12 @@ const styles = StyleSheet.create({
   itemsContainer: {
     paddingHorizontal: 8,
     paddingTop: 10,
-    paddingBottom: 20,
   },
-  
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   item: {
     width: '32%',
     alignItems: 'flex-start',
@@ -635,11 +667,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: 'bold',
-  },
-  loader: {
-    marginTop: 30,
-  },
-  subLoader: {
-    marginVertical: 10,
   },
 });
