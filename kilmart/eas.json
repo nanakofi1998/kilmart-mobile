@@ -46,5 +46,8 @@
         "appleTeamId": "Z8R44237W5"
       }
     }
+  },
+  "cli": {
+    "appVersionSource": "remote"
   }
 }

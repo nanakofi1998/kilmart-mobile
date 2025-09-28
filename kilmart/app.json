@@ -25,7 +25,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby stores and delivery options.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photos to allow you to upload profile pictures.",
-        "NSCameraUsageDescription": "This app uses the camera to scan barcodes and take profile pictures."
+        "NSCameraUsageDescription": "This app uses the camera to scan barcodes and take profile pictures.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
