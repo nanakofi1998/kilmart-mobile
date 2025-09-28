@@ -7,11 +7,11 @@ import {
   ScrollView, 
   ActivityIndicator,
   Platform,
-  StatusBar,
-  Modal
+  StatusBar
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../utils/apiClient';
 import * as SecureStore from 'expo-secure-store';
 import AuthInput from '../../components/AuthInput';
@@ -158,11 +158,14 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={{ 
-      flex: 1, 
-      backgroundColor: '#fff',
-      paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
-    }}>
+    <LinearGradient
+      colors={['#f1b811', '#000000', '#ffffff']}
+      locations={[0, 0.5, 1]}
+      style={{ 
+        flex: 1,
+        paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+      }}
+    >
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
@@ -189,7 +192,8 @@ export default function LoginScreen() {
               fontSize: 28,
               fontFamily: 'inter-bold',
               marginBottom: 20,
-              color: '#333',
+              color: '#fff',
+              textAlign: 'start',
             }}
           >
             Login
@@ -224,7 +228,7 @@ export default function LoginScreen() {
           >
             <Text style={{ 
               color: '#f1b811', 
-              fontFamily: 'inter-medium',
+              fontFamily: 'inter-bold',
               opacity: loading ? 0.5 : 1 
             }}>
               Forgot password?
@@ -243,20 +247,20 @@ export default function LoginScreen() {
               opacity: loading ? 0.7 : 1,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 3,
-              elevation: 3,
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
             }}
             onPress={handleLogin}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#000" />
             ) : (
               <Text
                 style={{
                   textAlign: 'center',
-                  color: '#fff',
+                  color: '#000',
                   fontFamily: 'inter-bold',
                   fontSize: 16,
                 }}
@@ -272,7 +276,7 @@ export default function LoginScreen() {
                 textAlign: 'center',
                 fontFamily: 'inter-medium',
                 fontStyle: 'italic',
-                color: '#666',
+                color: '#fff',
               }}
             >
               Don't have an account?
@@ -281,7 +285,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={{
-              backgroundColor: '#000000ff',
+              backgroundColor: '#000',
               padding: 16,
               borderRadius: 12,
               marginVertical: 10,
@@ -293,7 +297,7 @@ export default function LoginScreen() {
             <Text
               style={{
                 textAlign: 'center',
-                color: '#ffffffff',
+                color: '#f1b811',
                 fontFamily: 'inter-bold',
                 fontSize: 16,
               }}
@@ -302,88 +306,87 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Custom Alert Modal */}
-          <Modal
-            visible={showAlert}
-            transparent
-            animationType="fade"
-            onRequestClose={() => !alertConfig.isSuccess && setShowAlert(false)}
-          >
-            <View style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 20,
-            }}>
-              <View style={{
-                backgroundColor: 'white',
-                padding: 20,
-                borderRadius: 12,
-                minWidth: 280,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 3.84,
-                elevation: 5,
-              }}>
-                <Text style={{
-                  fontFamily: 'inter-bold',
-                  fontSize: 18,
-                  color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
-                  marginBottom: 10,
-                  textAlign: 'center',
-                }}>
-                  {alertConfig.title}
-                </Text>
-                <Text style={{
-                  fontFamily: 'inter-regular',
-                  fontSize: 14,
-                  textAlign: 'center',
-                  marginBottom: 20,
-                  color: '#333',
-                  lineHeight: 20,
-                }}>
-                  {alertConfig.message}
-                </Text>
-                {!alertConfig.isSuccess && (
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: '#D32F2F',
-                      padding: 12,
-                      borderRadius: 8,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => setShowAlert(false)}
-                  >
-                    <Text style={{
-                      color: 'white',
-                      fontFamily: 'inter-medium',
-                      fontSize: 16,
-                    }}>
-                      OK
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </Modal>
-
           <View style={{ marginTop: 'auto', paddingTop: 20 }}>
             <Text style={{ 
               textAlign: 'center', 
               fontSize: 12, 
               fontFamily: 'inter-regular',
-              color: '#666',
+              color: '#fff',
               lineHeight: 16,
             }}>
               By clicking login you agree to our{' '}
-              <Text style={{ color: '#f1b811' }}>Terms of use</Text> and{' '}
-              <Text style={{ color: '#f1b811' }}>Privacy policy</Text>
+              <Text style={{ color: '#f1b811', fontFamily: 'inter-bold' }}>Terms of use</Text> and{' '}
+              <Text style={{ color: '#f1b811', fontFamily: 'inter-bold' }}>Privacy policy</Text>
             </Text>
           </View>
         </View>
       </ScrollView>
-    </View>
+
+      {/* Custom Alert Modal */}
+      {showAlert && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}>
+          <View style={{
+            backgroundColor: 'white',
+            padding: 20,
+            borderRadius: 12,
+            minWidth: 280,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 5,
+          }}>
+            <Text style={{
+              fontFamily: 'inter-bold',
+              fontSize: 18,
+              color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
+              marginBottom: 10,
+              textAlign: 'center',
+            }}>
+              {alertConfig.title}
+            </Text>
+            <Text style={{
+              fontFamily: 'inter-regular',
+              fontSize: 14,
+              textAlign: 'center',
+              marginBottom: 20,
+              color: '#333',
+              lineHeight: 20,
+            }}>
+              {alertConfig.message}
+            </Text>
+            {!alertConfig.isSuccess && (
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#D32F2F',
+                  padding: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+                onPress={() => setShowAlert(false)}
+              >
+                <Text style={{
+                  color: 'white',
+                  fontFamily: 'inter-medium',
+                  fontSize: 16,
+                }}>
+                  OK
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+    </LinearGradient>
   );
 }
