@@ -92,8 +92,77 @@ export default function Orders() {
     return orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal), 0).toFixed(2);
   };
 
+  // Helper function to get status styles based on actual status
+  const getStatusStyles = (paymentStatus, orderStatus) => {
+    // Payment status styles
+    if (paymentStatus === 'Paid') {
+      return {
+        backgroundColor: '#e6f3e6',
+        color: '#2e7d32',
+        text: 'Paid'
+      };
+    } else if (paymentStatus === 'Unpaid') {
+      return {
+        backgroundColor: '#ffebee',
+        color: '#d32f2f',
+        text: 'Unpaid'
+      };
+    } else {
+      return {
+        backgroundColor: '#fff3e0',
+        color: '#f57c00',
+        text: paymentStatus || 'Pending'
+      };
+    }
+  };
+
+  // Helper function to get order status styles
+  const getOrderStatusStyles = (orderStatus) => {
+    switch (orderStatus) {
+      case 'Approved':
+        return {
+          backgroundColor: '#e8f5e8',
+          color: '#2e7d32',
+          text: 'Approved'
+        };
+      case 'Pending':
+        return {
+          backgroundColor: '#fff3e0',
+          color: '#f57c00',
+          text: 'Processing'
+        };
+      case 'Shipped':
+        return {
+          backgroundColor: '#e3f2fd',
+          color: '#1976d2',
+          text: 'Shipped'
+        };
+      case 'Delivered':
+        return {
+          backgroundColor: '#e6f3e6',
+          color: '#2e7d32',
+          text: 'Delivered'
+        };
+      case 'Cancelled':
+        return {
+          backgroundColor: '#ffebee',
+          color: '#d32f2f',
+          text: 'Cancelled'
+        };
+      default:
+        return {
+          backgroundColor: '#f5f5f5',
+          color: '#666',
+          text: orderStatus || 'Pending'
+        };
+    }
+  };
+
   const renderOrderItem = ({ item }) => {
     const firstItem = item.order_items && item.order_items.length > 0 ? item.order_items[0] : null;
+    const paymentStatus = getStatusStyles(item.payment_status, item.status);
+    const orderStatus = getOrderStatusStyles(item.status);
+
     return (
       <TouchableOpacity
         style={styles.orderCard}
@@ -114,87 +183,157 @@ export default function Orders() {
             />
             <View style={styles.orderDetails}>
               <Text style={styles.itemName}>{firstItem.product_details.name}</Text>
+              <Text style={styles.quantity}>Quantity: {firstItem.quantity}</Text>
               <Text style={styles.viewDetailsText}>Tap to view order details</Text>
             </View>
           </View>
         ) : (
           <Text style={styles.noItemsText}>No items in this order</Text>
         )}
+        
         <View style={styles.statusContainer}>
-          <Text style={[styles.status, styles.paidStatus]}>Paid</Text>
-          <Text style={[styles.status, styles.pendingStatus]}>Delivery Pending</Text>
+          <Text style={[
+            styles.status,
+            { backgroundColor: paymentStatus.backgroundColor, color: paymentStatus.color }
+          ]}>
+            {paymentStatus.text}
+          </Text>
+          <Text style={[
+            styles.status,
+            { backgroundColor: orderStatus.backgroundColor, color: orderStatus.color }
+          ]}>
+            {orderStatus.text}
+          </Text>
         </View>
+        
+        <Text style={styles.totalAmount}>Total: GH₵{item.total_amount}</Text>
       </TouchableOpacity>
     );
   };
 
-  const renderModalContent = () => (
-    <TouchableOpacity
-      style={styles.modalOverlay}
-      activeOpacity={1}
-      onPress={() => setIsModalVisible(false)}
-    >
-      <View style={[
-        styles.modalContent,
-        { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
-      ]}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Order Details</Text>
-          <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="black" />
-          </TouchableOpacity>
-        </View>
-        {modalLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#000" />
-            <Text style={styles.loadingText}>Loading order details...</Text>
+  const renderModalContent = () => {
+    if (!selectedOrder) return null;
+
+    const paymentStatus = getStatusStyles(selectedOrder.payment_status, selectedOrder.status);
+    const orderStatus = getOrderStatusStyles(selectedOrder.status);
+
+    return (
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setIsModalVisible(false)}
+      >
+        <View style={[
+          styles.modalContent,
+          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
+        ]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Order Details</Text>
+            <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="black" />
+            </TouchableOpacity>
           </View>
-        ) : modalError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{modalError}</Text>
-          </View>
-        ) : !selectedOrder ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Order not found.</Text>
-          </View>
-        ) : (
-          <View style={styles.modalOrderCard}>
-            <Text style={styles.orderDate}>Ordered on {formatDate(selectedOrder.order_date)}</Text>
-            {selectedOrder.order_items && selectedOrder.order_items.length > 0 ? (
-              selectedOrder.order_items.map((orderItem, index) => (
-                <View key={index} style={styles.orderItem}>
-                  <Image
-                    source={{
-                      uri: orderItem.product_details.product_image || 'https://via.placeholder.com/80',
-                    }}
-                    style={styles.itemImage}
-                    resizeMode="cover"
-                    onError={() =>
-                      console.log('Image failed to load:', orderItem.product_details.product_image)
-                    }
-                  />
-                  <View style={styles.orderDetails}>
-                    <Text style={styles.itemName}>{orderItem.product_details.name}</Text>
-                    <Text style={styles.quantity}>Quantity: {orderItem.quantity}</Text>
+          {modalLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#000" />
+              <Text style={styles.loadingText}>Loading order details...</Text>
+            </View>
+          ) : modalError ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{modalError}</Text>
+            </View>
+          ) : (
+            <View style={styles.modalOrderCard}>
+              <Text style={styles.orderDate}>Ordered on {formatDate(selectedOrder.order_date)}</Text>
+              
+              {/* Order Items */}
+              {selectedOrder.order_items && selectedOrder.order_items.length > 0 ? (
+                selectedOrder.order_items.map((orderItem, index) => (
+                  <View key={index} style={styles.orderItem}>
+                    <Image
+                      source={{
+                        uri: orderItem.product_details.product_image || 'https://via.placeholder.com/80',
+                      }}
+                      style={styles.itemImage}
+                      resizeMode="cover"
+                      onError={() =>
+                        console.log('Image failed to load:', orderItem.product_details.product_image)
+                      }
+                    />
+                    <View style={styles.orderDetails}>
+                      <Text style={styles.itemName}>{orderItem.product_details.name}</Text>
+                      <Text style={styles.quantity}>Quantity: {orderItem.quantity}</Text>
+                      <Text style={styles.itemPrice}>
+                        Price: GH₵{orderItem.price_at_purchase} each
+                      </Text>
+                      <Text style={styles.itemSubtotal}>
+                        Subtotal: GH₵{orderItem.subtotal}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noItemsText}>No items in this order</Text>
+              )}
+              
+              {/* Order Summary */}
+              <View style={styles.orderSummary}>
+                <Text style={styles.orderId}>Order ID: {selectedOrder.order_id}</Text>
+                
+                {selectedOrder.shipping_address && (
+                  <Text style={styles.address}>Delivery Address: {selectedOrder.shipping_address}</Text>
+                )}
+                
+                <View style={styles.amountContainer}>
+                  <Text style={styles.amountLabel}>Total Amount:</Text>
+                  <Text style={styles.amount}>GH₵{selectedOrder.total_amount}</Text>
+                </View>
+                
+                {selectedOrder.discount_amount !== "0.00" && (
+                  <Text style={styles.discount}>
+                    Discount: -GH₵{selectedOrder.discount_amount}
+                  </Text>
+                )}
+                
+                {selectedOrder.coupon_code && (
+                  <Text style={styles.coupon}>Coupon: {selectedOrder.coupon_code}</Text>
+                )}
+                
+                <Text style={styles.paymentMethod}>
+                  Payment Method: {selectedOrder.payment_method}
+                </Text>
+                
+                {selectedOrder.payment_reference && (
+                  <Text style={styles.reference}>
+                    Reference: {selectedOrder.payment_reference}
+                  </Text>
+                )}
+                
+                {/* Status Section */}
+                <View style={styles.statusSection}>
+                  <Text style={styles.statusSectionTitle}>Order Status</Text>
+                  <View style={styles.statusContainer}>
+                    <Text style={[
+                      styles.status,
+                      { backgroundColor: paymentStatus.backgroundColor, color: paymentStatus.color }
+                    ]}>
+                      Payment: {paymentStatus.text}
+                    </Text>
+                    <Text style={[
+                      styles.status,
+                      { backgroundColor: orderStatus.backgroundColor, color: orderStatus.color }
+                    ]}>
+                      Order: {orderStatus.text}
+                    </Text>
                   </View>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.noItemsText}>No items in this order</Text>
-            )}
-            <View style={styles.orderSummary}>
-              <Text style={styles.address}>Delivery Address: {selectedOrder.shipping_address}</Text>
-              <Text style={styles.amount}>Total: GH₵{calculateTotal(selectedOrder.order_items)}</Text>
-              <View style={styles.statusContainer}>
-                <Text style={[styles.status, styles.paidStatus]}>Paid</Text>
-                <Text style={[styles.status, styles.pendingStatus]}>Delivery Pending</Text>
               </View>
             </View>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -266,7 +405,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerPlaceholder: {
-    width: 34, // Same as back button for balance
+    width: 34,
   },
   listContainer: {
     padding: 20,
@@ -307,6 +446,18 @@ const styles = StyleSheet.create({
     fontFamily: 'inter-medium',
     fontSize: 14,
     color: '#666',
+    marginBottom: 2,
+  },
+  itemPrice: {
+    fontFamily: 'inter-regular',
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  itemSubtotal: {
+    fontFamily: 'inter-bold',
+    fontSize: 12,
+    color: '#333',
   },
   orderSummary: {
     borderTopWidth: 1,
@@ -319,21 +470,71 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 10,
   },
+  totalAmount: {
+    fontFamily: 'inter-bold',
+    fontSize: 16,
+    color: '#333',
+    marginTop: 10,
+    textAlign: 'right',
+  },
   address: {
     fontFamily: 'inter-medium',
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
   },
+  amountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  amountLabel: {
+    fontFamily: 'inter-medium',
+    fontSize: 14,
+    color: '#666',
+  },
   amount: {
     fontFamily: 'inter-bold',
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
+  },
+  discount: {
+    fontFamily: 'inter-medium',
+    fontSize: 14,
+    color: '#4CAF50',
     marginBottom: 5,
+  },
+  coupon: {
+    fontFamily: 'inter-medium',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  paymentMethod: {
+    fontFamily: 'inter-medium',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  reference: {
+    fontFamily: 'inter-regular',
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 10,
+  },
+  orderId: {
+    fontFamily: 'inter-medium',
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
   statusContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
   },
   status: {
     fontFamily: 'inter-medium',
@@ -341,15 +542,18 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 15,
-    marginRight: 10,
   },
-  paidStatus: {
-    backgroundColor: '#e6f3e6',
-    color: '#2e7d32',
+  statusSection: {
+    marginTop: 15,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
-  pendingStatus: {
-    backgroundColor: '#fff3e0',
-    color: '#f57c00',
+  statusSectionTitle: {
+    fontFamily: 'inter-bold',
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
   },
   loadingContainer: {
     flex: 1,
