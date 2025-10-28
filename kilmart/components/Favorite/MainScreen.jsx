@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -19,23 +19,29 @@ import { AntDesign } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiClient from '../../utils/apiClient';
-import AwesomeAlert from 'react-native-awesome-alerts';
 import { useCart } from '../../context/CartContext';
 
 export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [alert, setAlert] = useState({ show: false, title: '', message: '' });
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    isSuccess: false,
+  });
   const router = useRouter();
   const { addToCart } = useCart();
   const insets = useSafeAreaInsets();
 
-  const showAlert = (title, message) => {
-    setAlert({ show: true, title, message });
+  const displayAlert = (title, message, isSuccess = false) => {
+    setShowAlert(false);
+    setAlertConfig({ title, message, isSuccess });
+    setShowAlert(true);
   };
 
   const fetchFavorites = async () => {
@@ -44,11 +50,11 @@ export default function FavoritesScreen() {
       console.log('Favorites response:', response.data);
       setFavorites(response.data || []);
     } catch (error) {
-      console.error('Error fetching favorites:', error);
+      //console.error('Error fetching favorites:', error);
       if (error.response?.status === 401) {
-        showAlert('Error', 'Please login to view your favorites');
+        displayAlert('Error', 'Please login to view your favorites');
       } else {
-        showAlert('Error', 'Failed to load favorites. Please try again.');
+        displayAlert('Error', 'Failed to load favorites. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -58,21 +64,21 @@ export default function FavoritesScreen() {
 
   const removeFromFavorites = async (favoriteId, event) => {
     if (event) event.stopPropagation();
-    
+
     try {
       await apiClient.delete(`api/favourites/remove/${favoriteId}/`);
-      showAlert('Success', 'Product removed from favorites!');
+      displayAlert('Success', 'Product removed from favorites!', true);
       setFavorites(prev => prev.filter(item => item.id !== favoriteId));
     } catch (error) {
-      console.error('Error removing from favorites:', error);
-      showAlert('Error', 'Failed to remove from favorites. Please try again.');
+      // console.error('Error removing from favorites:', error);
+      displayAlert('Error', 'Failed to remove from favorites. Please try again.');
       fetchFavorites();
     }
   };
 
   const confirmRemove = (favoriteId, productName, event) => {
     if (event) event.stopPropagation();
-    
+
     Alert.alert(
       'Remove Favorite',
       `Are you sure you want to remove ${productName} from favorites?`,
@@ -94,12 +100,14 @@ export default function FavoritesScreen() {
       setIsModalVisible(false);
       router.push({
         pathname: '/product-detail',
-        params: { 
+        params: {
           productId: product.product.id,
           productName: product.product.name,
           productPrice: product.product.price,
           productImage: product.product.product_image,
-          productDescription: product.product.description
+          productDescription: product.product.description,
+          product_sku: product.product_sku,
+          available_stock: product.available_stock
         }
       });
     }
@@ -113,31 +121,31 @@ export default function FavoritesScreen() {
 
   const handleAddToCart = async () => {
     if (!selectedProduct?.product) {
-      showAlert('Error', 'No product selected');
+      displayAlert('Error', 'No product selected');
       return;
     }
 
     try {
       const product = selectedProduct.product;
-      
+
       if (product.available_stock === 0) {
-        showAlert('Unavailable', 'This product is out of stock.');
+        displayAlert('Unavailable', 'This product is out of stock.');
         return;
       }
 
       if (quantity > product.available_stock) {
-        showAlert('Out of Stock', `Only ${product.available_stock} available`);
+        displayAlert('Out of Stock', `Only ${product.available_stock} available`);
         return;
       }
 
       await addToCart(product, quantity);
 
-      showAlert('Success', `${product.name} (${quantity}) added to your cart!`);
-      
+      displayAlert('Success', `${product.name} (${quantity}) added to your cart!`, true);
+
       setIsModalVisible(false);
       setQuantity(1);
     } catch (error) {
-      showAlert('Error', 'Failed to add item to cart');
+      displayAlert('Error', 'Failed to add item to cart');
       console.error('Add to cart error:', error);
     }
   };
@@ -158,17 +166,17 @@ export default function FavoritesScreen() {
   );
 
   const renderProductItem = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.productCard}
       onPress={() => handleProductPress(item)}
       activeOpacity={0.7}
     >
-      <Image 
+      <Image
         source={{ uri: item.product?.product_image || 'https://via.placeholder.com/100' }}
         style={styles.productImage}
         defaultSource={require('../../assets/images/kwikmart.png')}
       />
-      
+
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>
           {item.product?.name || 'Unknown Product'}
@@ -176,7 +184,7 @@ export default function FavoritesScreen() {
         <Text style={styles.productPrice}>
           GH₵{item.product?.price ? parseFloat(item.product.price).toFixed(2) : '0.00'}
         </Text>
-        
+
         {item.product?.available_stock !== undefined && (
           <Text style={[
             styles.stockStatus,
@@ -185,13 +193,13 @@ export default function FavoritesScreen() {
             {item.product.available_stock > 0 ? 'In Stock' : 'Out of Stock'}
           </Text>
         )}
-        
+
         <View style={styles.quickActions}>
           <Text style={styles.tapToViewText}>Tap to View</Text>
         </View>
       </View>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.favoriteButton}
         onPress={(e) => confirmRemove(item.id, item.product?.name, e)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -210,9 +218,9 @@ export default function FavoritesScreen() {
       <Text style={styles.emptySubtext}>
         Start adding products to your favorites by tapping the heart icon on any product.
       </Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.browseButton}
-        onPress={() => router.push('/categories')}
+        onPress={() => router.push('/home')}
       >
         <Text style={styles.browseButtonText}>Browse Products</Text>
       </TouchableOpacity>
@@ -278,26 +286,26 @@ export default function FavoritesScreen() {
         transparent
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setIsModalVisible(false)}
         >
           <View style={[
             styles.modalContent,
             { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
           ]}>
-            <Image 
+            <Image
               source={{ uri: selectedProduct?.product?.product_image }}
               style={styles.modalImage}
               defaultSource={require('../../assets/images/kwikmart.png')}
             />
-            
+
             <Text style={styles.modalProductName}>{selectedProduct?.product?.name}</Text>
             <Text style={styles.modalProductPrice}>
               GH₵{selectedProduct?.product?.price ? parseFloat(selectedProduct.product.price).toFixed(2) : '0.00'}
             </Text>
-            
+
             <Text style={styles.modalStock}>
               Available: {selectedProduct?.product?.available_stock || 0} units
             </Text>
@@ -320,8 +328,8 @@ export default function FavoritesScreen() {
                 />
 
                 <TouchableOpacity
-                  style={[styles.quantityButton, { 
-                    opacity: quantity >= (selectedProduct?.product?.available_stock || 0) ? 0.4 : 1 
+                  style={[styles.quantityButton, {
+                    opacity: quantity >= (selectedProduct?.product?.available_stock || 0) ? 0.4 : 1
                   }]}
                   onPress={() => handleQuantityChange(1)}
                   disabled={quantity >= (selectedProduct?.product?.available_stock || 0)}
@@ -332,14 +340,14 @@ export default function FavoritesScreen() {
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.viewDetailButton}
                 onPress={() => handleViewProduct(selectedProduct)}
               >
                 <Text style={styles.viewDetailButtonText}>View Details</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[
                   styles.addToCartButton,
                   { opacity: selectedProduct?.product?.available_stock === 0 ? 0.6 : 1 }
@@ -353,7 +361,7 @@ export default function FavoritesScreen() {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setIsModalVisible(false)}
             >
@@ -363,16 +371,70 @@ export default function FavoritesScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <AwesomeAlert
-        show={alert.show}
-        title={alert.title}
-        message={alert.message}
-        closeOnTouchOutside={true}
-        showConfirmButton={true}
-        confirmText="Okay"
-        confirmButtonColor="#333"
-        onConfirmPressed={() => setAlert({ ...alert, show: false })}
-      />
+      {/* Custom Alert Modal */}
+      <Modal
+        visible={showAlert}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAlert(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}>
+          <View style={{
+            backgroundColor: 'white',
+            padding: 20,
+            borderRadius: 12,
+            minWidth: 280,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 5,
+          }}>
+            <Text style={{
+              fontFamily: 'inter-bold',
+              fontSize: 18,
+              color: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
+              marginBottom: 10,
+              textAlign: 'center',
+            }}>
+              {alertConfig.title}
+            </Text>
+            <Text style={{
+              fontFamily: 'inter-regular',
+              fontSize: 14,
+              textAlign: 'center',
+              marginBottom: 20,
+              color: '#333',
+              lineHeight: 20,
+            }}>
+              {alertConfig.message}
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: alertConfig.isSuccess ? '#4CAF50' : '#D32F2F',
+                padding: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+              onPress={() => setShowAlert(false)}
+            >
+              <Text style={{
+                color: 'white',
+                fontFamily: 'inter-medium',
+                fontSize: 16,
+              }}>
+                OK
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -423,7 +485,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
   },
   emptyIconContainer: {
     shadowOffset: { width: 0, height: 2 },

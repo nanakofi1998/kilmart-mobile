@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, TouchableWithoutFeedback, Platform,} from "react-native";
 import React, { useCallback, useRef, useState } from "react";
-import { AntDesign } from "@expo/vector-icons";
+import { AntDesign, Entypo } from "@expo/vector-icons";
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
   
   type OptionItem = {
@@ -54,10 +54,9 @@ import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
           onPress={toggleExpanded}
         >
           <View style={{alignItems:'center',flexDirection:'row', gap:10}}>
-          <FontAwesome6 name="location-arrow" size={18} color="#0070fb" />
           <Text style={styles.text}>{value || placeholder}</Text>
           </View>
-          <AntDesign name={expanded ? "caretup" : "caretdown"} />
+          <Entypo name="location" size={21} color="#0070fb" />
         </TouchableOpacity>
         {expanded ? (
           <Modal visible={expanded} transparent>

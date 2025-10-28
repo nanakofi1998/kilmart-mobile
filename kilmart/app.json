@@ -2,9 +2,9 @@
   "expo": {
     "name": "kwikmart",
     "slug": "kwikmart",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
-    "icon": "./assets/images/kwikmart.png",
+    "icon": "./assets/images/kwikmart_logo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -31,7 +31,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/kwikmart.png",
+        "foregroundImage": "./assets/images/kwikmart_logo.png",
         "backgroundColor": "#ffffff"
       },
       "package": "dev.expertech.kwirkmart",
@@ -68,7 +68,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/kwikmart.png",
+          "image": "./assets/images/kwikmart_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

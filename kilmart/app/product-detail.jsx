@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -7,24 +7,75 @@ import {
   TouchableOpacity, 
   StyleSheet,
   Platform,
-  StatusBar
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCart } from '../context/CartContext'; 
 
 export default function ProductDetail() {
-  const { productId, productName, productPrice, productImage, productDescription } = useLocalSearchParams();
+  const { 
+    productId, 
+    productName, 
+    productPrice, 
+    productImage, 
+    productDescription,
+    product_sku,
+    available_stock 
+  } = useLocalSearchParams();
+  
   const insets = useSafeAreaInsets();
+  const { addToCart } = useCart(); 
+  const [quantity, setQuantity] = useState(1);
+  const [addingToCart, setAddingToCart] = useState(false);
 
   const handleBack = () => {
     router.back();
   };
 
-  const handleAddToCart = () => {
-    // Add to cart functionality would go here
-    console.log('Add to cart:', { productId, productName, productPrice });
+  const handleAddToCart = async () => {
+    setAddingToCart(true);
+    try {
+      const product = {
+        id: productId,
+        name: productName,
+        price: productPrice,
+        image: productImage,
+        sku: product_sku,
+        stock: parseInt(available_stock || 0) // Use 'stock' to match your CartContext
+      };
+
+      await addToCart(product, quantity);
+      
+      // Show success message
+      alert(`${quantity} ${productName} added to cart successfully!`);
+      
+      // Reset quantity after adding to cart
+      setQuantity(1);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      alert('Failed to add product to cart');
+    } finally {
+      setAddingToCart(false);
+    }
   };
+
+  const incrementQuantity = () => {
+    const maxStock = parseInt(available_stock || 0);
+    if (quantity < maxStock) {
+      setQuantity(quantity + 1);
+    }
+  };
+
+  const decrementQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+    }
+  };
+
+  const isOutOfStock = parseInt(available_stock || 0) <= 0;
 
   return (
     <View style={[
@@ -61,7 +112,54 @@ export default function ProductDetail() {
         {/* Product Info */}
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{productName}</Text>
+          <Text style={styles.productSku}>SKU: {product_sku}</Text>
           <Text style={styles.productPrice}>GH₵{productPrice}</Text>
+          
+          {/* Stock Status */}
+          <Text style={[
+            styles.stockStatus,
+            { color: !isOutOfStock ? '#4CAF50' : '#F44336' }
+          ]}>
+            {!isOutOfStock ? `${available_stock} in stock` : 'Out of stock'}
+          </Text>
+
+          {/* Quantity Selector */}
+          {!isOutOfStock && (
+            <View style={styles.quantityContainer}>
+              <Text style={styles.quantityLabel}>Quantity:</Text>
+              <View style={styles.quantitySelector}>
+                <TouchableOpacity 
+                  style={[
+                    styles.quantityButton,
+                    quantity <= 1 && styles.quantityButtonDisabled
+                  ]}
+                  onPress={decrementQuantity}
+                  disabled={quantity <= 1}
+                >
+                  <Ionicons 
+                    name="remove" 
+                    size={20} 
+                    color={quantity <= 1 ? '#ccc' : '#333'} 
+                  />
+                </TouchableOpacity>
+                <Text style={styles.quantityText}>{quantity}</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.quantityButton,
+                    quantity >= parseInt(available_stock) && styles.quantityButtonDisabled
+                  ]}
+                  onPress={incrementQuantity}
+                  disabled={quantity >= parseInt(available_stock)}
+                >
+                  <Ionicons 
+                    name="add" 
+                    size={20} 
+                    color={quantity >= parseInt(available_stock) ? '#ccc' : '#333'} 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           
           {/* Description Section */}
           <View style={styles.descriptionSection}>
@@ -71,13 +169,9 @@ export default function ProductDetail() {
             </Text>
           </View>
 
-          {/* Features/Details Section */}
-          {/* <View style={styles.featuresSection}>
-            <Text style={styles.sectionTitle}>Product Details</Text>
-            <View style={styles.featureItem}>
-              <Ionicons name="cube-outline" size={18} color="#666" />
-              <Text style={styles.featureText}>Free delivery on orders above GH₵100</Text>
-            </View>
+          {/* Product Features */}
+          <View style={styles.featuresSection}>
+            <Text style={styles.sectionTitle}>Product Features</Text>
             <View style={styles.featureItem}>
               <Ionicons name="shield-checkmark-outline" size={18} color="#666" />
               <Text style={styles.featureText}>Authentic product guarantee</Text>
@@ -86,7 +180,7 @@ export default function ProductDetail() {
               <Ionicons name="return-down-back-outline" size={18} color="#666" />
               <Text style={styles.featureText}>Easy returns within 7 days</Text>
             </View>
-          </View> */}
+          </View>
         </View>
       </ScrollView>
 
@@ -95,9 +189,24 @@ export default function ProductDetail() {
         styles.footer,
         { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 10 : 10 }
       ]}>
-        <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
-          <Ionicons name="cart-outline" size={20} color="#fff" />
-          <Text style={styles.addToCartText}>Add to Cart</Text>
+        <TouchableOpacity 
+          style={[
+            styles.addToCartButton,
+            { opacity: !isOutOfStock ? 1 : 0.5 }
+          ]} 
+          onPress={handleAddToCart}
+          disabled={isOutOfStock || addingToCart}
+        >
+          {addingToCart ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="cart-outline" size={20} color="#fff" />
+              <Text style={styles.addToCartText}>
+                {isOutOfStock ? 'Out of Stock' : `Add ${quantity} to Cart`}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -127,13 +236,13 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   headerPlaceholder: {
-    width: 34, // Same as back button for balance
+    width: 34,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 80, // Space for the fixed button
+    paddingBottom: 80,
   },
   imageContainer: {
     backgroundColor: '#f9f9f9',
@@ -154,14 +263,61 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: 'inter-bold',
     color: '#333',
-    marginBottom: 10,
+    marginBottom: 8,
     lineHeight: 28,
+  },
+  productSku: {
+    fontSize: 14,
+    fontFamily: 'inter-regular',
+    color: '#666',
+    marginBottom: 8,
   },
   productPrice: {
     fontSize: 28,
     fontFamily: 'inter-bold',
     color: '#f1b811',
+    marginBottom: 12,
+  },
+  stockStatus: {
+    fontSize: 16,
+    fontFamily: 'inter-medium',
     marginBottom: 20,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 25,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  quantityLabel: {
+    fontFamily: 'inter-medium',
+    fontSize: 16,
+    color: '#333',
+  },
+  quantitySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+  },
+  quantityButton: {
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+  },
+  quantityText: {
+    fontFamily: 'inter-medium',
+    fontSize: 16,
+    paddingHorizontal: 20,
+    minWidth: 40,
+    textAlign: 'center',
   },
   descriptionSection: {
     marginBottom: 25,
@@ -170,7 +326,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'inter-bold',
     color: '#333',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   productDescription: {
     fontSize: 16,

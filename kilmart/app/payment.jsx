@@ -53,7 +53,6 @@ export function Payment() {
     isSuccess: false,
   });
 
-  // New address form fields
   const [newAddress, setNewAddress] = useState({
     address_line_1: '',
     address_line_2: '',

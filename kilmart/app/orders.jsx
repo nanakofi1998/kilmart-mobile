@@ -68,7 +68,7 @@ export default function Orders() {
       setModalLoading(true);
       setModalError(null);
       const response = await apiClient.get(`api/v1/${orderId}/`);
-      console.log('Order details response:', JSON.stringify(response.data, null, 2));
+      //console.log('Order details response:', JSON.stringify(response.data, null, 2));
       setSelectedOrder(response.data);
       setModalLoading(false);
       setIsModalVisible(true);

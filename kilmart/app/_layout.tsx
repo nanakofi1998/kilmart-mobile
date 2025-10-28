@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { CartProvider } from "../context/CartContext";
 import "../global.css"
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "./AuthContext";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -16,13 +17,15 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <CartProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </CartProvider>
-    </SafeAreaProvider>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <CartProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </CartProvider>
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }

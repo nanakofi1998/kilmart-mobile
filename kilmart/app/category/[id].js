@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ScrollView,
   Modal, TextInput, ActivityIndicator, Dimensions, Alert, Platform,
-  StatusBar
+  StatusBar, PanResponder
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import { useCart } from '../../context/CartContext'
 
 const { width } = Dimensions.get('window');
 const numColumns = 3;
+const SWIPE_THRESHOLD = 50; // Minimum swipe distance
 
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams();
@@ -34,15 +35,67 @@ export default function CategoryScreen() {
       subCategories: true,
       items: true
     },
-    favorites: [], // Track favorite items
-    favoriteLoading: {} // Track loading state for individual favorite buttons
+    favorites: [],
+    favoriteLoading: {}
   });
 
   const mainScrollViewRef = useRef(null);
   const subScrollViewRef = useRef(null);
   const tabRefs = useRef({});
+  const panResponderRef = useRef(null);
 
-  // Fetch user's favorites
+  // Create pan responder for swipe gestures
+  useEffect(() => {
+    panResponderRef.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const { dx } = gestureState;
+        
+        // Swipe right (positive dx) - go to previous
+        if (dx > SWIPE_THRESHOLD) {
+          handleSwipe('right');
+        }
+        // Swipe left (negative dx) - go to next
+        else if (dx < -SWIPE_THRESHOLD) {
+          handleSwipe('left');
+        }
+      },
+    });
+  }, [state.selectedMainTab, state.selectedSubTab, state.subCategories, state.categories]);
+
+  const handleSwipe = (direction) => {
+    const currentMainIndex = state.categories.findIndex(cat => cat.id === state.selectedMainTab);
+    const currentSubIndex = state.subCategories.findIndex(sub => sub.id === state.selectedSubTab);
+    
+    if (direction === 'left') {
+      // Swipe left - go to next subcategory or next category
+      if (currentSubIndex < state.subCategories.length - 1) {
+        // Next subcategory in current category
+        const nextSub = state.subCategories[currentSubIndex + 1];
+        handleSubTabChange(nextSub.id);
+      } else if (currentMainIndex < state.categories.length - 1) {
+        // Move to next category (first subcategory)
+        const nextMain = state.categories[currentMainIndex + 1];
+        handleMainTabChange(nextMain.id);
+      }
+    } else {
+      // Swipe right - go to previous subcategory or previous category
+      if (currentSubIndex > 0) {
+        // Previous subcategory in current category
+        const prevSub = state.subCategories[currentSubIndex - 1];
+        handleSubTabChange(prevSub.id);
+      } else if (currentMainIndex > 0) {
+        // Move to previous category (last subcategory)
+        const prevMain = state.categories[currentMainIndex - 1];
+        handleMainTabChange(prevMain.id);
+      }
+    }
+  };
+
   const fetchFavorites = useCallback(async () => {
     try {
       const response = await apiClient.get('api/favourites/');
@@ -52,7 +105,6 @@ export default function CategoryScreen() {
       }));
     } catch (error) {
       console.error('Error fetching favorites:', error);
-      // Don't show error for favorites as it's non-critical
     }
   }, []);
 
@@ -61,7 +113,6 @@ export default function CategoryScreen() {
       const response = await apiClient.get(url);
       let data = response.data;
 
-      // 🔥 Sanitize prices if fetching products
       if (stateKey === 'items') {
         data = data.map(item => {
           let cleanPrice = Number(item.price);
@@ -83,7 +134,6 @@ export default function CategoryScreen() {
       }));
       return data;
     } catch (error) {
-      console.error(`Failed to fetch ${stateKey}:`, error);
       setState(prev => ({
         ...prev,
         loading: { ...prev.loading, [loadingKey]: false }
@@ -103,24 +153,20 @@ export default function CategoryScreen() {
     }
   }, []);
 
-  // Check if item is favorited
   const isItemFavorited = useCallback((itemId) => {
     return state.favorites.some(fav => fav.product?.id === itemId);
   }, [state.favorites]);
 
-  // Get favorite ID for an item
   const getFavoriteId = useCallback((itemId) => {
     const favorite = state.favorites.find(fav => fav.product?.id === itemId);
     return favorite?.id;
   }, [state.favorites]);
 
-  // Toggle favorite status
   const toggleFavorite = useCallback(async (item) => {
     const itemId = item.id;
     const isCurrentlyFavorite = isItemFavorited(itemId);
     const favoriteId = getFavoriteId(itemId);
 
-    // Set loading state for this specific item
     setState(prev => ({
       ...prev,
       favoriteLoading: { ...prev.favoriteLoading, [itemId]: true }
@@ -128,7 +174,6 @@ export default function CategoryScreen() {
 
     try {
       if (isCurrentlyFavorite && favoriteId) {
-        // Remove from favorites
         await apiClient.delete(`api/favourites/${favoriteId}/`);
         setState(prev => ({
           ...prev,
@@ -136,7 +181,6 @@ export default function CategoryScreen() {
         }));
         Alert.alert('Success', 'Removed from favorites!');
       } else {
-        // Add to favorites
         const response = await apiClient.post('api/favourites/', { 
           product: itemId 
         });
@@ -154,7 +198,6 @@ export default function CategoryScreen() {
         Alert.alert('Error', 'Failed to update favorites. Please try again.');
       }
     } finally {
-      // Clear loading state for this item
       setState(prev => ({
         ...prev,
         favoriteLoading: { ...prev.favoriteLoading, [itemId]: false }
@@ -165,7 +208,7 @@ export default function CategoryScreen() {
   useFocusEffect(useCallback(() => {
     const initialize = async () => {
       const cats = await fetchData('api/categories/', 'categories', 'categories');
-      await fetchFavorites(); // Fetch favorites when screen loads
+      await fetchFavorites();
       
       if (state.selectedMainTab) {
         await handleMainTabChange(state.selectedMainTab);
@@ -187,6 +230,13 @@ export default function CategoryScreen() {
 
     if (subs.length > 0) {
       handleSubTabChange(subs[0].id);
+    } else {
+      // If no subcategories, clear items
+      setState(prev => ({
+        ...prev,
+        items: [],
+        loading: { ...prev.loading, items: false }
+      }));
     }
 
     scrollToTab(categoryId, mainScrollViewRef);
@@ -326,11 +376,14 @@ export default function CategoryScreen() {
   };
 
   return (
-    <View style={{ 
-      flex: 1,
-      backgroundColor: '#fff',
-      paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
-    }}>
+    <View 
+      style={{ 
+        flex: 1,
+        backgroundColor: '#fff',
+        paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+      }}
+      {...panResponderRef.current?.panHandlers} // Add swipe gesture handlers
+    >
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <ScrollView 
@@ -351,6 +404,13 @@ export default function CategoryScreen() {
           {state.subCategories.map(subCategory => renderTab(subCategory, false))}
         </ScrollView>
       </View>
+
+      {/* Swipe Instructions */}
+      {/* <View style={styles.swipeInstruction}>
+        <Text style={styles.swipeInstructionText}>
+          Swipe left/right to navigate categories
+        </Text>
+      </View> */}
 
       {/* Products */}
       {state.loading.items ? (
@@ -406,7 +466,6 @@ export default function CategoryScreen() {
             </View>
             
             <Text style={styles.modalItemName}>{state.selectedItem?.name}</Text>
-            <Text style={styles.modalItemStock}>available: {state.selectedItem?.stock}</Text>
             <Text style={styles.modalItemPrice}>GH₵{state.selectedItem?.price}</Text>
 
             <View style={styles.quantityContainer}>
@@ -472,9 +531,6 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingVertical: 8,
     paddingBottom: 12,
-  },
-  subTabScrollView: {
-    marginTop: -4, // Bring subcategories closer to main tabs
   },
   subTab: {
     paddingHorizontal: 16,
@@ -552,10 +608,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'start',
     fontFamily: 'inter',
-    height: 16, // Fixed height for 2 lines
-    lineHeight: 16, // Proper line spacing
-    overflow: 'hidden', // Important for truncation
-    width: '100%', // Needed for proper text wrapping
+    height: 16,
+    lineHeight: 16,
+    overflow: 'hidden',
+    width: '100%',
     marginTop: 4,
   },
   itemPrice: {
@@ -626,13 +682,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  modalItemStock: {
-    fontWeight: '300',
-    fontSize: 14,
-    textAlign: 'center',
-    color: '#000',
-    marginTop: 5,
-  },
   modalItemPrice: {
     fontWeight: 'bold',
     fontSize: 20,
@@ -667,5 +716,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: 'bold',
+  },
+  swipeInstruction: {
+    padding: 10,
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  swipeInstructionText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
 });

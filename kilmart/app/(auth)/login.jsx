@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ScrollView,
   ActivityIndicator,
   Platform,
   StatusBar
@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../utils/apiClient';
-import * as SecureStore from 'expo-secure-store';
+import { useAuth } from '../AuthContext';
 import AuthInput from '../../components/AuthInput';
 
 export default function LoginScreen() {
@@ -29,6 +29,7 @@ export default function LoginScreen() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { login } = useAuth();
 
   const displayAlert = (title, message, isSuccess = false, redirectPath = null) => {
     setShowAlert(false);
@@ -44,10 +45,8 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    // Reset loading state properly
     setLoading(true);
 
-    // Validation
     if (!email.trim() || !password.trim()) {
       displayAlert('Error', 'Please enter both email and password');
       setLoading(false);
@@ -60,9 +59,9 @@ export default function LoginScreen() {
       return;
     }
 
-    const credentials = { 
-      email: email.trim().toLowerCase(), 
-      password 
+    const credentials = {
+      email: email.trim().toLowerCase(),
+      password
     };
 
     try {
@@ -71,7 +70,6 @@ export default function LoginScreen() {
 
       const { access, refresh, user, must_change_password } = response.data;
 
-      // Validate response structure
       if (typeof access !== 'string' || !access) {
         throw new Error('Invalid access token received');
       }
@@ -84,30 +82,11 @@ export default function LoginScreen() {
         throw new Error('Invalid user data received');
       }
 
-      console.log('Storing tokens and user data:', {
-        access: access.substring(0, 20) + '...',
-        refresh: refresh.substring(0, 20) + '...',
-        userId: user.id,
-        fullName: user.full_name,
-        isVerified: user.is_verified,
-        mustChangePassword: must_change_password
-      });
+      // Pass must_change_password as a separate parameter
+      await login(access, refresh, user, must_change_password);
 
-      // Store all necessary user data
-      await Promise.all([
-        SecureStore.setItemAsync('access_token', access),
-        SecureStore.setItemAsync('refresh_token', refresh),
-        SecureStore.setItemAsync('user_id', user.id.toString()),
-        SecureStore.setItemAsync('user_email', user.email),
-        SecureStore.setItemAsync('user_name', user.full_name || ''),
-        SecureStore.setItemAsync('user_phone', user.phone_number || ''),
-        SecureStore.setItemAsync('is_verified', user.is_verified.toString()),
-        SecureStore.setItemAsync('must_change_password', must_change_password.toString()),
-      ]);
-
-      // Determine redirect path based on conditions
       let redirectPath = '/home';
-      
+
       if (must_change_password) {
         redirectPath = '/change-password';
         displayAlert('Success', 'Login successful! Please change your password.', true, redirectPath);
@@ -126,15 +105,15 @@ export default function LoginScreen() {
       });
 
       let errorMessage = 'Failed to login. Please try again.';
-      
+
       if (error.response?.status === 401) {
-        errorMessage = error.response?.data?.detail || 
-                      error.response?.data?.non_field_errors?.[0] || 
-                      'Invalid email or password.';
+        errorMessage = error.response?.data?.detail ||
+          error.response?.data?.non_field_errors?.[0] ||
+          'Invalid email or password.';
       } else if (error.response?.status === 400) {
-        errorMessage = error.response?.data?.email?.[0] || 
-                      error.response?.data?.password?.[0] || 
-                      'Invalid input data.';
+        errorMessage = error.response?.data?.email?.[0] ||
+          error.response?.data?.password?.[0] ||
+          'Invalid input data.';
       } else if (error.response?.status === 429) {
         errorMessage = 'Too many login attempts. Please try again later.';
       } else if (error.code === 'ERR_NETWORK') {
@@ -149,6 +128,7 @@ export default function LoginScreen() {
     }
   };
 
+  // ... rest of your component remains the same
   const handleForgotPassword = () => {
     router.push('/forgot-pwd');
   };
@@ -161,12 +141,12 @@ export default function LoginScreen() {
     <LinearGradient
       colors={['#f1b811', '#000000', '#ffffff']}
       locations={[0, 0.5, 1]}
-      style={{ 
+      style={{
         flex: 1,
-        paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+        paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight
       }}
     >
-      <ScrollView 
+      <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
@@ -182,10 +162,10 @@ export default function LoginScreen() {
           resizeMode="cover"
         />
 
-        <View style={{ 
-          padding: 20, 
+        <View style={{
+          padding: 20,
           flex: 1,
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20
         }}>
           <Text
             style={{
@@ -209,7 +189,7 @@ export default function LoginScreen() {
             editable={!loading}
             iconName="mail-outline"
           />
-          
+
           <AuthInput
             placeholder="Password"
             secure
@@ -226,10 +206,10 @@ export default function LoginScreen() {
             onPress={handleForgotPassword}
             disabled={loading}
           >
-            <Text style={{ 
-              color: '#f1b811', 
+            <Text style={{
+              color: '#f1b811',
               fontFamily: 'inter-bold',
-              opacity: loading ? 0.5 : 1 
+              opacity: loading ? 0.5 : 1
             }}>
               Forgot password?
             </Text>
@@ -307,9 +287,9 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <View style={{ marginTop: 'auto', paddingTop: 20 }}>
-            <Text style={{ 
-              textAlign: 'center', 
-              fontSize: 12, 
+            <Text style={{
+              textAlign: 'center',
+              fontSize: 12,
               fontFamily: 'inter-regular',
               color: '#fff',
               lineHeight: 16,
