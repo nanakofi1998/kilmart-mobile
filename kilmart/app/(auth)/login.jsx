@@ -128,7 +128,6 @@ export default function LoginScreen() {
     }
   };
 
-  // ... rest of your component remains the same
   const handleForgotPassword = () => {
     router.push('/forgot-pwd');
   };
@@ -139,8 +138,8 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={['#f1b811', '#000000', '#ffffff']}
-      locations={[0, 0.5, 1]}
+      colors={['#ffffff', '#fff9e6', '#f1b811']}
+      locations={[0, 0.3, 1]}
       style={{
         flex: 1,
         paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight
@@ -172,7 +171,7 @@ export default function LoginScreen() {
               fontSize: 28,
               fontFamily: 'inter-bold',
               marginBottom: 20,
-              color: '#fff',
+              color: '#000',
               textAlign: 'start',
             }}
           >
@@ -256,7 +255,7 @@ export default function LoginScreen() {
                 textAlign: 'center',
                 fontFamily: 'inter-medium',
                 fontStyle: 'italic',
-                color: '#fff',
+                color: '#000',
               }}
             >
               Don't have an account?
@@ -270,6 +269,8 @@ export default function LoginScreen() {
               borderRadius: 12,
               marginVertical: 10,
               opacity: loading ? 0.7 : 1,
+              borderWidth: 2,
+              borderColor: '#f1b811',
             }}
             onPress={handleSignUp}
             disabled={loading}
@@ -291,12 +292,12 @@ export default function LoginScreen() {
               textAlign: 'center',
               fontSize: 12,
               fontFamily: 'inter-regular',
-              color: '#fff',
+              color: '#000',
               lineHeight: 16,
             }}>
               By clicking login you agree to our{' '}
-              <Text style={{ color: '#f1b811', fontFamily: 'inter-bold' }}>Terms of use</Text> and{' '}
-              <Text style={{ color: '#f1b811', fontFamily: 'inter-bold' }}>Privacy policy</Text>
+              <Text style={{ color: '#ffffffff', fontFamily: 'inter-bold' }}>Terms of use</Text> and{' '}
+              <Text style={{ color: '#ffffffff', fontFamily: 'inter-bold' }}>Privacy policy</Text>
             </Text>
           </View>
         </View>
