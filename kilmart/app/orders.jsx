@@ -13,11 +13,10 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/core';
 import apiClient from '../utils/apiClient';
+import { router } from 'expo-router';
 
 function Header() {
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   
   return (
@@ -25,7 +24,7 @@ function Header() {
       styles.headerContainer,
       { paddingTop: Platform.OS === 'ios' ? insets.top : 20 }
     ]}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <TouchableOpacity onPress={() => router.push('/profile')} style={styles.backButton}>
         <Ionicons name="chevron-back-sharp" size={24} color="black" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>My Orders</Text>

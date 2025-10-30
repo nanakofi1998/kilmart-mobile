@@ -340,7 +340,7 @@ export default function CategoryScreen() {
 
     return (
       <View style={styles.item}>
-        <View style={styles.imageContainer}>
+        <TouchableOpacity style={styles.imageContainer} onPress={() => router.push('/product-detail')}>
           <Image source={{ uri: item.product_image }} style={styles.itemImage} />
           <TouchableOpacity 
             style={styles.favoriteButton}
@@ -357,7 +357,7 @@ export default function CategoryScreen() {
               />
             )}
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
         
         <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
         <Text style={styles.itemName} numberOfLines={2} ellipsizeMode='tail'>{item.name}</Text>

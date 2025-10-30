@@ -18,7 +18,7 @@ export default function Menu() {
           </View>
           <Text style={{fontFamily:'poppins-bold', fontSize:20, color:'#141414'}}>GH₵ 0.00</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
+        <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}onPress={() => router.push('/coupon-screen')}>
           <AntDesign name="gift" size={28} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Gifts & Coupons</Text>
         </TouchableOpacity>
@@ -38,11 +38,11 @@ export default function Menu() {
           <Octicons name="location" size={24} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Addresses</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
+        {/* <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
           <MaterialIcons name="payment" size={24} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Payment Methods</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
+        </TouchableOpacity> */}
+        <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}} onPress={() => router.push('/ContactUs')}>
           <MaterialIcons name="support-agent" size={24} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Contact Us</Text>
         </TouchableOpacity>

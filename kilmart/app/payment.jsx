@@ -16,11 +16,13 @@ import {
 } from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Feather from '@expo/vector-icons/Feather';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
 import { useCart } from '../context/CartContext';
+import { useAuth } from './AuthContext';
 import apiClient from '../utils/apiClient';
 
 // Handle web browser authentication sessions
@@ -30,8 +32,10 @@ export function Payment() {
   const { cartItems: cartItemsString, totalPrice } = useLocalSearchParams();
   const cartItems = JSON.parse(cartItemsString || '[]');
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(user?.email || '');
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [shippingAddresses, setShippingAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -72,6 +76,13 @@ export function Payment() {
   const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
 
   const { removeItemsByIds } = useCart();
+
+  // Set user's email on component mount
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
 
   // Fetch user's shipping addresses
   const fetchShippingAddresses = async () => {
@@ -144,6 +155,33 @@ export function Payment() {
 
     setIsDeliveryDetailsComplete(true);
     displayAlert('Success', 'Delivery details confirmed!', true);
+  };
+
+  const handleEmailEdit = () => {
+    if (isDeliveryDetailsComplete) {
+      // If already confirmed, allow editing but reset confirmation
+      setIsDeliveryDetailsComplete(false);
+    }
+    setIsEditingEmail(true);
+  };
+
+  const handleEmailSave = () => {
+    if (!email) {
+      displayAlert('Error', 'Please enter your email address');
+      return;
+    }
+    if (!validateEmail(email)) {
+      displayAlert('Error', 'Please enter a valid email address');
+      return;
+    }
+    setIsEditingEmail(false);
+    displayAlert('Success', 'Email updated successfully!', true);
+  };
+
+  const handleEmailCancel = () => {
+    // Reset to user's original email
+    setEmail(user?.email || '');
+    setIsEditingEmail(false);
   };
 
   // Clear all timeouts on component unmount
@@ -370,16 +408,52 @@ export function Payment() {
             Delivery Details <FontAwesome5 name="shipping-fast" size={22} />
           </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email Address"
-            value={email}
-            onChangeText={setEmail}
-            editable={!isDeliveryDetailsComplete}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#999"
-          />
+          {/* Email Input with Edit Icon */}
+          <View style={styles.emailContainer}>
+            <View style={styles.emailInputContainer}>
+              <TextInput
+                style={[
+                  styles.input,
+                  isEditingEmail ? styles.editingInput : styles.readOnlyInput
+                ]}
+                placeholder="Email Address"
+                value={email}
+                onChangeText={setEmail}
+                editable={isEditingEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#999"
+              />
+              {!isEditingEmail ? (
+                <TouchableOpacity 
+                  style={styles.editIconButton}
+                  onPress={handleEmailEdit}
+                >
+                  <Feather name="edit-2" size={18} color="#666" />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.emailActions}>
+                  <TouchableOpacity 
+                    style={styles.emailActionButton}
+                    onPress={handleEmailSave}
+                  >
+                    <Feather name="check" size={18} color="#4CAF50" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.emailActionButton}
+                    onPress={handleEmailCancel}
+                  >
+                    <Feather name="x" size={18} color="#D32F2F" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            {!isEditingEmail && user?.email === email && (
+              <Text style={styles.registeredEmailText}>
+                Your registered email address
+              </Text>
+            )}
+          </View>
 
           {/* Address Selection */}
           <View style={styles.addressSection}>
@@ -657,16 +731,53 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: '#333'
   },
+  // Email Section Styles
+  emailContainer: {
+    marginBottom: 15,
+  },
+  emailInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   input: { 
+    flex: 1,
     backgroundColor: '#f9f9f9', 
     borderRadius: 10, 
     padding: 15, 
-    marginBottom: 10, 
     fontSize: 16, 
     color: '#333',
     borderWidth: 1,
     borderColor: '#eee',
     fontFamily: 'inter-regular'
+  },
+  readOnlyInput: {
+    backgroundColor: '#f5f5f5',
+    color: '#666',
+  },
+  editingInput: {
+    backgroundColor: '#fff',
+    borderColor: '#f1b811',
+  },
+  editIconButton: {
+    position: 'absolute',
+    right: 15,
+    padding: 5,
+  },
+  emailActions: {
+    flexDirection: 'row',
+    position: 'absolute',
+    right: 10,
+  },
+  emailActionButton: {
+    padding: 5,
+    marginLeft: 10,
+  },
+  registeredEmailText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontFamily: 'inter-regular',
+    marginTop: 5,
+    marginLeft: 15,
   },
   addressSection: {
     marginBottom: 20,
