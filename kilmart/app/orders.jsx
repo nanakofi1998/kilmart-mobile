@@ -55,7 +55,7 @@ export default function Orders() {
       }
       
       const response = await apiClient.get('api/v1/list/');
-      console.log('Orders response:', JSON.stringify(response.data, null, 2));
+      // console.log('Orders response:', JSON.stringify(response.data, null, 2));
       setOrders(response.data);
       setError(null);
     } catch (err) {
