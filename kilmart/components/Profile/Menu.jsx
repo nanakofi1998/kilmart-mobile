@@ -34,10 +34,10 @@ export default function Menu() {
           <Ionicons name="receipt-outline" size={24} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Order History</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
+        {/* <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
           <Octicons name="location" size={24} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Addresses</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         {/* <TouchableOpacity style={{marginTop:40, flexDirection:'row',alignItems:'center', gap:10}}>
           <MaterialIcons name="payment" size={24} color="#141414" />
           <Text style={{fontFamily:'poppins', fontSize:17, color:'#141414'}}>Payment Methods</Text>

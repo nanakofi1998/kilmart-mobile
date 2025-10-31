@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
-  StatusBar
+  StatusBar,
+  RefreshControl
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,26 +42,41 @@ export default function Orders() {
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
+  const fetchOrders = async (isPullToRefresh = false) => {
+    try {
+      if (isPullToRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        const response = await apiClient.get('api/v1/list/');
-        console.log('Orders response:', JSON.stringify(response.data, null, 2));
-        setOrders(response.data);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-        setError('Failed to load orders. Please try again.');
+      }
+      
+      const response = await apiClient.get('api/v1/list/');
+      console.log('Orders response:', JSON.stringify(response.data, null, 2));
+      setOrders(response.data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError('Failed to load orders. Please try again.');
+    } finally {
+      if (isPullToRefresh) {
+        setRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchOrders();
   }, []);
+
+  const onRefresh = () => {
+    fetchOrders(true);
+  };
 
   const fetchOrderDetails = async (orderId) => {
     try {
@@ -360,6 +376,16 @@ export default function Orders() {
             { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 20 : 20 }
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#000000']}
+              tintColor="#000000"
+              title="Pull to refresh"
+              titleColor="#000000"
+            />
+          }
         />
       )}
       <Modal

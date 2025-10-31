@@ -13,7 +13,7 @@ import { useCart } from '../../context/CartContext'
 
 const { width } = Dimensions.get('window');
 const numColumns = 3;
-const SWIPE_THRESHOLD = 50; // Minimum swipe distance
+const SWIPE_THRESHOLD = 50;
 
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams();
@@ -25,7 +25,7 @@ export default function CategoryScreen() {
     categories: [],
     subCategories: [],
     items: [],
-    selectedMainTab: id,
+    selectedMainTab: null,
     selectedSubTab: null,
     selectedItem: null,
     quantity: 1,
@@ -43,55 +43,72 @@ export default function CategoryScreen() {
   const subScrollViewRef = useRef(null);
   const tabRefs = useRef({});
   const panResponderRef = useRef(null);
+  const isInitializing = useRef(true);
+  const hasHandledInitialCategory = useRef(false);
+  
+  // Use ref to track current category for swipe gestures
+  const currentCategoryRef = useRef(null);
+
+  // Update the ref whenever selectedMainTab changes
+  useEffect(() => {
+    currentCategoryRef.current = state.selectedMainTab;
+    console.log('🔄 Ref updated:', currentCategoryRef.current, 'Type:', typeof currentCategoryRef.current);
+  }, [state.selectedMainTab]);
 
   // Create pan responder for swipe gestures
   useEffect(() => {
     panResponderRef.current = PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to horizontal swipes
         return Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderRelease: (evt, gestureState) => {
         const { dx } = gestureState;
-        
-        // Swipe right (positive dx) - go to previous
+
         if (dx > SWIPE_THRESHOLD) {
           handleSwipe('right');
-        }
-        // Swipe left (negative dx) - go to next
-        else if (dx < -SWIPE_THRESHOLD) {
+        } else if (dx < -SWIPE_THRESHOLD) {
           handleSwipe('left');
         }
       },
     });
-  }, [state.selectedMainTab, state.selectedSubTab, state.subCategories, state.categories]);
+  }, [state.categories]);
 
   const handleSwipe = (direction) => {
-    const currentMainIndex = state.categories.findIndex(cat => cat.id === state.selectedMainTab);
-    const currentSubIndex = state.subCategories.findIndex(sub => sub.id === state.selectedSubTab);
+    if (state.categories.length === 0) return;
+
+    const currentCategoryId = currentCategoryRef.current;
+    
+    // Convert both to numbers for comparison
+    const currentMainIndex = state.categories.findIndex(cat => 
+      Number(cat.id) === Number(currentCategoryId)
+    );
+    
+    console.log('🔄 Swipe detected:', direction, 'Current ID:', currentCategoryId, 'Type:', typeof currentCategoryId, 'Current index:', currentMainIndex);
+    console.log('📋 Categories:', state.categories.map(cat => `${cat.id}(${typeof cat.id}): ${cat.name}`));
+    
+    if (currentMainIndex === -1) {
+      console.log('❌ Current category not found. Looking for:', currentCategoryId, 'Available:', state.categories.map(c => c.id));
+      return;
+    }
     
     if (direction === 'left') {
-      // Swipe left - go to next subcategory or next category
-      if (currentSubIndex < state.subCategories.length - 1) {
-        // Next subcategory in current category
-        const nextSub = state.subCategories[currentSubIndex + 1];
-        handleSubTabChange(nextSub.id);
-      } else if (currentMainIndex < state.categories.length - 1) {
-        // Move to next category (first subcategory)
+      // Swipe left - go to next category
+      if (currentMainIndex < state.categories.length - 1) {
         const nextMain = state.categories[currentMainIndex + 1];
+        console.log('🔄 Swipe left: Moving to next category', nextMain.name, 'ID:', nextMain.id, 'Index:', currentMainIndex + 1);
         handleMainTabChange(nextMain.id);
+      } else {
+        console.log('ℹ️ Already at last category, cannot swipe left');
       }
     } else {
-      // Swipe right - go to previous subcategory or previous category
-      if (currentSubIndex > 0) {
-        // Previous subcategory in current category
-        const prevSub = state.subCategories[currentSubIndex - 1];
-        handleSubTabChange(prevSub.id);
-      } else if (currentMainIndex > 0) {
-        // Move to previous category (last subcategory)
+      // Swipe right - go to previous category
+      if (currentMainIndex > 0) {
         const prevMain = state.categories[currentMainIndex - 1];
+        console.log('🔄 Swipe right: Moving to previous category', prevMain.name, 'ID:', prevMain.id, 'Index:', currentMainIndex - 1);
         handleMainTabChange(prevMain.id);
+      } else {
+        console.log('ℹ️ Already at first category, cannot swipe right');
       }
     }
   };
@@ -112,6 +129,15 @@ export default function CategoryScreen() {
     try {
       const response = await apiClient.get(url);
       let data = response.data;
+
+      if (stateKey === 'categories') {
+        // Sort categories by ID to ensure consistent order and ensure IDs are numbers
+        data = data.sort((a, b) => Number(a.id) - Number(b.id)).map(cat => ({
+          ...cat,
+          id: Number(cat.id) // Ensure ID is a number
+        }));
+        console.log('📊 Categories loaded and sorted:', data.map(cat => `${cat.id}(${typeof cat.id}): ${cat.name}`));
+      }
 
       if (stateKey === 'items') {
         data = data.map(item => {
@@ -144,12 +170,29 @@ export default function CategoryScreen() {
 
   const scrollToTab = useCallback((tabId, scrollViewRef, offset = -10) => {
     const tabRef = tabRefs.current[tabId];
+    
     if (tabRef && scrollViewRef.current) {
-      tabRef.measureLayout(
-        scrollViewRef.current,
-        (x) => scrollViewRef.current?.scrollTo({ x: x + offset, animated: true }),
-        () => { }
-      );
+      // Use a small timeout to ensure the ref is measured correctly
+      setTimeout(() => {
+        tabRef.measureLayout(
+          scrollViewRef.current,
+          (x) => {
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollTo({ 
+                x: Math.max(0, x + offset), 
+                animated: true 
+              });
+            }
+          },
+          () => {
+            console.log('❌ Failed to measure tab layout for:', tabId);
+            // Fallback: scroll to start if measurement fails
+            scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+          }
+        );
+      }, 50);
+    } else {
+      console.log('❌ Tab ref or scrollView ref not available for:', tabId);
     }
   }, []);
 
@@ -181,8 +224,8 @@ export default function CategoryScreen() {
         }));
         Alert.alert('Success', 'Removed from favorites!');
       } else {
-        const response = await apiClient.post('api/favourites/', { 
-          product: itemId 
+        const response = await apiClient.post('api/favourites/', {
+          product: itemId
         });
         setState(prev => ({
           ...prev,
@@ -207,42 +250,91 @@ export default function CategoryScreen() {
 
   useFocusEffect(useCallback(() => {
     const initialize = async () => {
+      if (hasHandledInitialCategory.current) return;
+
+      isInitializing.current = true;
       const cats = await fetchData('api/categories/', 'categories', 'categories');
       await fetchFavorites();
-      
-      if (state.selectedMainTab) {
-        await handleMainTabChange(state.selectedMainTab);
+
+      let targetCategoryId = null;
+
+      // Priority: URL parameter > First category
+      if (id && cats.find(cat => cat.id.toString() === id.toString())) {
+        targetCategoryId = Number(id); // Ensure URL param is converted to number
+        console.log('🔄 Using URL category:', targetCategoryId, 'Type:', typeof targetCategoryId);
       } else if (cats.length > 0) {
-        handleMainTabChange(cats[0].id);
+        targetCategoryId = cats[0].id;
+        console.log('🔄 Using first category:', targetCategoryId, 'Type:', typeof targetCategoryId);
       }
+
+      if (targetCategoryId) {
+        await handleMainTabChange(targetCategoryId);
+        hasHandledInitialCategory.current = true;
+      }
+
+      isInitializing.current = false;
     };
+    
     initialize();
-  }, []));
+  }, [id]));
 
   const handleMainTabChange = useCallback(async (categoryId) => {
+    // Ensure categoryId is a number
+    const numericCategoryId = Number(categoryId);
+    console.log('📱 Changing main tab to:', numericCategoryId, 'Type:', typeof numericCategoryId, 'from current:', state.selectedMainTab);
+    
+    // Update both state and ref
     setState(prev => ({
       ...prev,
-      selectedMainTab: categoryId,
+      selectedMainTab: numericCategoryId,
+      selectedSubTab: null,
+      subCategories: [],
+      items: [],
       loading: { ...prev.loading, subCategories: true, items: true }
     }));
 
-    const subs = await fetchData(`api/categories/${categoryId}/subcategories/`, 'subCategories', 'subCategories');
+    currentCategoryRef.current = numericCategoryId;
+
+    // Use setTimeout to ensure scroll happens after re-render
+    setTimeout(() => {
+      scrollToTab(numericCategoryId, mainScrollViewRef);
+    }, 100);
+
+    // Load subcategories for the new category
+    const subs = await fetchData(`api/categories/${numericCategoryId}/subcategories/`, 'subCategories', 'subCategories');
 
     if (subs.length > 0) {
-      handleSubTabChange(subs[0].id);
+      // Always select the first subcategory when switching categories
+      const firstSub = subs[0];
+      console.log('🔄 Selecting first subcategory:', firstSub.name, 'ID:', firstSub.id);
+      
+      setState(prev => ({
+        ...prev,
+        selectedSubTab: firstSub.id
+      }));
+
+      // Load items for the first subcategory
+      await fetchData(`api/subcategories/${firstSub.id}/products/`, 'items', 'items');
+      
+      // Scroll to the first subcategory after a brief delay
+      setTimeout(() => {
+        scrollToTab(firstSub.id, subScrollViewRef);
+      }, 150);
     } else {
-      // If no subcategories, clear items
       setState(prev => ({
         ...prev,
         items: [],
+        selectedSubTab: null,
         loading: { ...prev.loading, items: false }
       }));
     }
-
-    scrollToTab(categoryId, mainScrollViewRef);
-  }, [fetchData, scrollToTab]);
+  }, [fetchData, scrollToTab, state.selectedMainTab]);
 
   const handleSubTabChange = useCallback(async (subCategoryId) => {
+    console.log('📱 Changing sub tab to:', subCategoryId);
+    
+    if (state.selectedSubTab === subCategoryId) return;
+
     setState(prev => ({
       ...prev,
       selectedSubTab: subCategoryId,
@@ -250,9 +342,11 @@ export default function CategoryScreen() {
     }));
 
     await fetchData(`api/subcategories/${subCategoryId}/products/`, 'items', 'items');
-
-    scrollToTab(subCategoryId, subScrollViewRef);
-  }, [fetchData, scrollToTab]);
+    
+    setTimeout(() => {
+      scrollToTab(subCategoryId, subScrollViewRef);
+    }, 100);
+  }, [fetchData, scrollToTab, state.selectedSubTab]);
 
   const handleAddToCart = (item) => {
     setState(prev => ({
@@ -340,9 +434,23 @@ export default function CategoryScreen() {
 
     return (
       <View style={styles.item}>
-        <TouchableOpacity style={styles.imageContainer} onPress={() => router.push('/product-detail')}>
+        <TouchableOpacity style={styles.imageContainer} onPress={() => {
+          router.push({
+            pathname: '/product-detail', 
+            params: {
+              productId: item.id?.toString() || '1',
+              productName: item.name || 'Product',
+              productPrice: item.price || '0',
+              productImage: item.product_image || '',
+              productDescription: item.description || 'No description available',
+              discountPrice: item.discount_price || '',
+              productSku: item.product_sku || '',
+              available_stock: item.available_stock?.toString() || '0'
+            }
+          });
+        }}>
           <Image source={{ uri: item.product_image }} style={styles.itemImage} />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.favoriteButton}
             onPress={() => toggleFavorite(item)}
             disabled={isFavoriteLoading}
@@ -350,15 +458,15 @@ export default function CategoryScreen() {
             {isFavoriteLoading ? (
               <ActivityIndicator size="small" color="#FF5252" />
             ) : (
-              <MaterialIcons 
-                name={isFavorited ? "favorite" : "favorite-border"} 
-                size={20} 
-                color={isFavorited ? "#FF5252" : "rgba(0,0,0,0.3)"} 
+              <MaterialIcons
+                name={isFavorited ? "favorite" : "favorite-border"}
+                size={20}
+                color={isFavorited ? "#FF5252" : "rgba(0,0,0,0.3)"}
               />
             )}
           </TouchableOpacity>
         </TouchableOpacity>
-        
+
         <Text style={styles.itemPrice}>GH₵{(item.price || 0).toFixed(2)}</Text>
         <Text style={styles.itemName} numberOfLines={2} ellipsizeMode='tail'>{item.name}</Text>
         <Text style={styles.itemDescription} numberOfLines={2} ellipsizeMode='tail'>{item.description}</Text>
@@ -376,41 +484,44 @@ export default function CategoryScreen() {
   };
 
   return (
-    <View 
-      style={{ 
+    <View
+      style={{
         flex: 1,
         backgroundColor: '#fff',
-        paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight 
+        paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight
       }}
-      {...panResponderRef.current?.panHandlers} // Add swipe gesture handlers
+      {...panResponderRef.current?.panHandlers}
     >
+      {/* Debug info - remove in production */}
+      {/* {__DEV__ && (
+        <View style={styles.debugInfo}>
+          <Text style={styles.debugText}>
+            Current: {state.selectedMainTab}({typeof state.selectedMainTab}) | 
+            Ref: {currentCategoryRef.current}({typeof currentCategoryRef.current})
+          </Text>
+        </View>
+      )} */}
+
       {/* Tabs */}
       <View style={styles.tabContainer}>
-        <ScrollView 
-          horizontal 
-          ref={mainScrollViewRef} 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          ref={mainScrollViewRef}
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.mainTabBarContainer}
         >
           {state.categories.map(category => renderTab(category))}
         </ScrollView>
 
-        <ScrollView 
-          horizontal 
-          ref={subScrollViewRef} 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          ref={subScrollViewRef}
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.subTabBarContainer}
         >
           {state.subCategories.map(subCategory => renderTab(subCategory, false))}
         </ScrollView>
       </View>
-
-      {/* Swipe Instructions */}
-      {/* <View style={styles.swipeInstruction}>
-        <Text style={styles.swipeInstructionText}>
-          Swipe left/right to navigate categories
-        </Text>
-      </View> */}
 
       {/* Products */}
       {state.loading.items ? (
@@ -437,9 +548,9 @@ export default function CategoryScreen() {
         transparent
         onRequestClose={() => setState(prev => ({ ...prev, isModalVisible: false }))}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setState(prev => ({ ...prev, isModalVisible: false }))}
         >
           <View style={[
@@ -448,7 +559,7 @@ export default function CategoryScreen() {
           ]}>
             <View style={styles.modalImageContainer}>
               <Image source={{ uri: state.selectedItem?.product_image }} style={styles.modalImage} />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalFavoriteButton}
                 onPress={() => state.selectedItem && toggleFavorite(state.selectedItem)}
                 disabled={state.favoriteLoading[state.selectedItem?.id]}
@@ -456,15 +567,15 @@ export default function CategoryScreen() {
                 {state.favoriteLoading[state.selectedItem?.id] ? (
                   <ActivityIndicator size="small" color="#FF5252" />
                 ) : (
-                  <MaterialIcons 
-                    name={state.selectedItem && isItemFavorited(state.selectedItem.id) ? "favorite" : "favorite-border"} 
-                    size={24} 
-                    color={state.selectedItem && isItemFavorited(state.selectedItem.id) ? "#FF5252" : "#666"} 
+                  <MaterialIcons
+                    name={state.selectedItem && isItemFavorited(state.selectedItem.id) ? "favorite" : "favorite-border"}
+                    size={24}
+                    color={state.selectedItem && isItemFavorited(state.selectedItem.id) ? "#FF5252" : "#666"}
                   />
                 )}
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.modalItemName}>{state.selectedItem?.name}</Text>
             <Text style={styles.modalItemPrice}>GH₵{state.selectedItem?.price}</Text>
 
@@ -502,7 +613,21 @@ export default function CategoryScreen() {
   );
 }
 
+
 const styles = StyleSheet.create({
+  debugInfo: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 5,
+    position: 'absolute',
+    top: 40,
+    left: 10,
+    zIndex: 1000,
+    borderRadius: 5,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 10,
+  },
   tabContainer: {
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -515,6 +640,11 @@ const styles = StyleSheet.create({
   mainTab: {
     marginRight: 24,
     paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  activeMainTab: {
+    backgroundColor: '#000',
   },
   mainTabText: {
     fontSize: 14,
@@ -619,7 +749,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#000000ff',
     fontFamily: 'inter',
-    textAlign:'start',
+    textAlign: 'start',
     lineHeight: 16,
   },
   addButton: {
@@ -716,15 +846,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: 'bold',
-  },
-  swipeInstruction: {
-    padding: 10,
-    alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-  },
-  swipeInstructionText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
   },
 });
