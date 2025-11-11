@@ -12,7 +12,8 @@ import {
   Modal, 
   FlatList,
   Platform,
-  StatusBar
+  StatusBar,
+  KeyboardAvoidingView
 } from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -56,6 +57,7 @@ export function Payment() {
     message: '',
     isSuccess: false,
   });
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
 
   const [newAddress, setNewAddress] = useState({
     address_line_1: '',
@@ -66,6 +68,8 @@ export function Payment() {
     country: 'Ghana',
     contact_phone: ''
   });
+
+  const [addressErrors, setAddressErrors] = useState({});
 
   const displayAlert = (title, message, isSuccess = false) => {
     setShowAlert(false);
@@ -105,13 +109,39 @@ export function Payment() {
     }
   };
 
+  const validateAddressForm = () => {
+    const errors = {};
+    
+    if (!newAddress.address_line_1.trim()) {
+      errors.address_line_1 = 'Address is required';
+    }
+    
+    if (!newAddress.city.trim()) {
+      errors.city = 'City is required';
+    }
+    
+    if (!newAddress.state_province_region.trim()) {
+      errors.state_province_region = 'State/Region is required';
+    }
+    
+    if (!newAddress.contact_phone.trim()) {
+      errors.contact_phone = 'Phone number is required';
+    } else if (!/^\+?[\d\s-()]+$/.test(newAddress.contact_phone)) {
+      errors.contact_phone = 'Invalid phone number format';
+    }
+    
+    setAddressErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   // Save new shipping address
   const saveNewAddress = async (setAsDefault = false) => {
+    if (!validateAddressForm()) {
+      return;
+    }
+
     try {
-      if (!newAddress.address_line_1 || !newAddress.city || !newAddress.contact_phone) {
-        displayAlert('Error', 'Please fill in required fields (Address, City, Phone)');
-        return;
-      }
+      setIsSavingAddress(true);
 
       const payload = {
         ...newAddress,
@@ -120,10 +150,12 @@ export function Payment() {
 
       const response = await apiClient.post('api/auth/shipping-address/', payload);
       
-      displayAlert('Success', 'Address saved successfully!', true);
-      await fetchShippingAddresses(); // Refresh addresses
+      // Update local state immediately without refetching
+      setShippingAddresses(prev => [...prev, response.data]);
       setSelectedAddressId(response.data.id);
-      setIsAddingNewAddress(false);
+      setUseDefaultAddress(false);
+      
+      // Reset form and close modal
       setNewAddress({
         address_line_1: '',
         address_line_2: '',
@@ -133,9 +165,16 @@ export function Payment() {
         country: 'Ghana',
         contact_phone: ''
       });
+      setAddressErrors({});
+      setIsAddingNewAddress(false);
+      setShowAddressModal(false);
+      
+      displayAlert('Success', 'Address saved successfully!', true);
     } catch (error) {
       console.error('Error saving address:', error);
       displayAlert('Error', 'Failed to save address. Please try again.');
+    } finally {
+      setIsSavingAddress(false);
     }
   };
 
@@ -159,7 +198,6 @@ export function Payment() {
 
   const handleEmailEdit = () => {
     if (isDeliveryDetailsComplete) {
-      // If already confirmed, allow editing but reset confirmation
       setIsDeliveryDetailsComplete(false);
     }
     setIsEditingEmail(true);
@@ -179,9 +217,27 @@ export function Payment() {
   };
 
   const handleEmailCancel = () => {
-    // Reset to user's original email
     setEmail(user?.email || '');
     setIsEditingEmail(false);
+  };
+
+  const resetAddressForm = () => {
+    setNewAddress({
+      address_line_1: '',
+      address_line_2: '',
+      city: '',
+      state_province_region: '',
+      postal_code: '',
+      country: 'Ghana',
+      contact_phone: ''
+    });
+    setAddressErrors({});
+    setIsAddingNewAddress(false);
+  };
+
+  const handleCloseAddressModal = () => {
+    resetAddressForm();
+    setShowAddressModal(false);
   };
 
   // Clear all timeouts on component unmount
@@ -271,7 +327,6 @@ export function Payment() {
         throw new Error('No access token found. Please log in again.');
       }
 
-      // Build the payload based on address selection
       let payload = {
         payment_method: 'Mobile Money',
         items: cartItems.map(item => ({
@@ -280,13 +335,11 @@ export function Payment() {
         })),
       };
 
-      // Add address information based on user selection
       if (useDefaultAddress) {
         payload.use_default_address = true;
       } else if (selectedAddressId) {
         payload.shipping_address_id = selectedAddressId;
       } else {
-        // Use the new address object if no saved address is selected
         payload.shipping_address_object = {
           address_line_1: newAddress.address_line_1,
           address_line_2: newAddress.address_line_2,
@@ -358,6 +411,7 @@ export function Payment() {
       onPress={() => {
         setSelectedAddressId(item.id);
         setUseDefaultAddress(false);
+        setShowAddressModal(false);
       }}
     >
       <View style={styles.addressHeader}>
@@ -462,7 +516,12 @@ export function Payment() {
             {/* Use Default Address Option */}
             <TouchableOpacity
               style={styles.defaultAddressOption}
-              onPress={() => setUseDefaultAddress(!useDefaultAddress)}
+              onPress={() => {
+                setUseDefaultAddress(!useDefaultAddress);
+                if (!useDefaultAddress) {
+                  setSelectedAddressId(null);
+                }
+              }}
             >
               <View style={styles.checkboxContainer}>
                 <View style={[
@@ -481,13 +540,13 @@ export function Payment() {
                 {isLoadingAddresses ? (
                   <ActivityIndicator size="small" color="#000" style={styles.loadingAddresses} />
                 ) : shippingAddresses.length > 0 ? (
-                  <FlatList
-                    data={shippingAddresses}
-                    renderItem={renderAddressItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
-                    style={styles.addressesList}
-                  />
+                  <View style={styles.addressesList}>
+                    {shippingAddresses.map((item) => (
+                      <View key={item.id}>
+                        {renderAddressItem({ item })}
+                      </View>
+                    ))}
+                  </View>
                 ) : (
                   <Text style={styles.noAddressesText}>No saved addresses found</Text>
                 )}
@@ -539,113 +598,231 @@ export function Payment() {
             visible={showAddressModal}
             animationType="slide"
             transparent
-            onRequestClose={() => setShowAddressModal(false)}
+            onRequestClose={handleCloseAddressModal}
           >
             <View style={styles.modalOverlay}>
               <View style={[
                 styles.modalContent,
-                { marginBottom: Platform.OS === 'ios' ? insets.bottom : 0 }
+                { 
+                  height: Platform.OS === 'ios' ? '85%' : '80%',
+                  marginTop: Platform.OS === 'ios' ? '15%' : '20%'
+                }
               ]}>
-                <Text style={styles.modalTitle}>
-                  {isAddingNewAddress ? 'Add New Address' : 'Select Address'}
-                </Text>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {isAddingNewAddress ? 'Add New Address' : 'Select Address'}
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={handleCloseAddressModal}
+                    style={styles.modalCloseButton}
+                  >
+                    <Feather name="x" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
 
                 {isAddingNewAddress ? (
-                  <ScrollView style={styles.addressForm}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Address Line 1 *"
-                      value={newAddress.address_line_1}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, address_line_1: text }))}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Address Line 2 (Optional)"
-                      value={newAddress.address_line_2}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, address_line_2: text }))}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="City *"
-                      value={newAddress.city}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, city: text }))}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="State/Region *"
-                      value={newAddress.state_province_region}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, state_province_region: text }))}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Postal Code"
-                      value={newAddress.postal_code}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, postal_code: text }))}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Country"
-                      value={newAddress.country}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, country: text }))}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Contact Phone *"
-                      value={newAddress.contact_phone}
-                      onChangeText={(text) => setNewAddress(prev => ({ ...prev, contact_phone: text }))}
-                      keyboardType="phone-pad"
-                      placeholderTextColor="#999"
-                    />
+                  <KeyboardAvoidingView 
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalBody}
+                  >
+                    <ScrollView 
+                      style={styles.addressFormScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.addressFormContent}
+                    >
+                      <View style={styles.formField}>
+                        <Text style={styles.fieldLabel}>Address Line 1 *</Text>
+                        <TextInput
+                          style={[
+                            styles.formInput,
+                            addressErrors.address_line_1 && styles.inputError
+                          ]}
+                          placeholder="Enter street address"
+                          value={newAddress.address_line_1}
+                          onChangeText={(text) => {
+                            setNewAddress(prev => ({ ...prev, address_line_1: text }));
+                            if (addressErrors.address_line_1) {
+                              setAddressErrors(prev => ({ ...prev, address_line_1: null }));
+                            }
+                          }}
+                          placeholderTextColor="#999"
+                        />
+                        {addressErrors.address_line_1 && (
+                          <Text style={styles.errorText}>{addressErrors.address_line_1}</Text>
+                        )}
+                      </View>
 
-                    <View style={styles.modalActions}>
+                      <View style={styles.formField}>
+                        <Text style={styles.fieldLabel}>Address Line 2</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          placeholder="Apartment, suite, etc. (optional)"
+                          value={newAddress.address_line_2}
+                          onChangeText={(text) => setNewAddress(prev => ({ ...prev, address_line_2: text }))}
+                          placeholderTextColor="#999"
+                        />
+                      </View>
+
+                      <View style={styles.formRow}>
+                        <View style={[styles.formField, styles.formFieldHalf]}>
+                          <Text style={styles.fieldLabel}>City *</Text>
+                          <TextInput
+                            style={[
+                              styles.formInput,
+                              addressErrors.city && styles.inputError
+                            ]}
+                            placeholder="City"
+                            value={newAddress.city}
+                            onChangeText={(text) => {
+                              setNewAddress(prev => ({ ...prev, city: text }));
+                              if (addressErrors.city) {
+                                setAddressErrors(prev => ({ ...prev, city: null }));
+                              }
+                            }}
+                            placeholderTextColor="#999"
+                          />
+                          {addressErrors.city && (
+                            <Text style={styles.errorText}>{addressErrors.city}</Text>
+                          )}
+                        </View>
+
+                        <View style={[styles.formField, styles.formFieldHalf]}>
+                          <Text style={styles.fieldLabel}>State/Region *</Text>
+                          <TextInput
+                            style={[
+                              styles.formInput,
+                              addressErrors.state_province_region && styles.inputError
+                            ]}
+                            placeholder="State"
+                            value={newAddress.state_province_region}
+                            onChangeText={(text) => {
+                              setNewAddress(prev => ({ ...prev, state_province_region: text }));
+                              if (addressErrors.state_province_region) {
+                                setAddressErrors(prev => ({ ...prev, state_province_region: null }));
+                              }
+                            }}
+                            placeholderTextColor="#999"
+                          />
+                          {addressErrors.state_province_region && (
+                            <Text style={styles.errorText}>{addressErrors.state_province_region}</Text>
+                          )}
+                        </View>
+                      </View>
+
+                      <View style={styles.formRow}>
+                        <View style={[styles.formField, styles.formFieldHalf]}>
+                          <Text style={styles.fieldLabel}>Postal Code</Text>
+                          <TextInput
+                            style={styles.formInput}
+                            placeholder="Postal Code"
+                            value={newAddress.postal_code}
+                            onChangeText={(text) => setNewAddress(prev => ({ ...prev, postal_code: text }))}
+                            placeholderTextColor="#999"
+                          />
+                        </View>
+
+                        <View style={[styles.formField, styles.formFieldHalf]}>
+                          <Text style={styles.fieldLabel}>Country</Text>
+                          <TextInput
+                            style={styles.formInput}
+                            placeholder="Country"
+                            value={newAddress.country}
+                            onChangeText={(text) => setNewAddress(prev => ({ ...prev, country: text }))}
+                            placeholderTextColor="#999"
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.formField}>
+                        <Text style={styles.fieldLabel}>Contact Phone *</Text>
+                        <TextInput
+                          style={[
+                            styles.formInput,
+                            addressErrors.contact_phone && styles.inputError
+                          ]}
+                          placeholder="Enter phone number"
+                          value={newAddress.contact_phone}
+                          onChangeText={(text) => {
+                            setNewAddress(prev => ({ ...prev, contact_phone: text }));
+                            if (addressErrors.contact_phone) {
+                              setAddressErrors(prev => ({ ...prev, contact_phone: null }));
+                            }
+                          }}
+                          keyboardType="phone-pad"
+                          placeholderTextColor="#999"
+                        />
+                        {addressErrors.contact_phone && (
+                          <Text style={styles.errorText}>{addressErrors.contact_phone}</Text>
+                        )}
+                      </View>
+
+                      <View style={styles.modalActions}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.cancelButton]}
+                          onPress={() => setIsAddingNewAddress(false)}
+                          disabled={isSavingAddress}
+                        >
+                          <Text style={styles.cancelButtonText}>Back</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.saveButton]}
+                          onPress={() => saveNewAddress(false)}
+                          disabled={isSavingAddress}
+                        >
+                          {isSavingAddress ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={styles.saveButtonText}>Save</Text>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.saveDefaultButton]}
+                          onPress={() => saveNewAddress(true)}
+                          disabled={isSavingAddress}
+                        >
+                          {isSavingAddress ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={styles.saveDefaultButtonText}>Save as Default</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </ScrollView>
+                  </KeyboardAvoidingView>
+                ) : (
+                  <View style={styles.selectAddressContainer}>
+                    <ScrollView 
+                      style={styles.addressListScroll}
+                      contentContainerStyle={styles.addressListContent}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {shippingAddresses.length > 0 ? (
+                        shippingAddresses.map((item) => (
+                          <View key={item.id} style={styles.addressItemWrapper}>
+                            {renderAddressItem({ item })}
+                          </View>
+                        ))
+                      ) : (
+                        <View style={styles.emptyAddressContainer}>
+                          <MaterialIcons name="location-off" size={48} color="#ccc" />
+                          <Text style={styles.emptyAddressText}>No addresses saved</Text>
+                          <Text style={styles.emptyAddressSubtext}>
+                            Add your first address to get started
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                    
+                    <View style={styles.addButtonContainer}>
                       <TouchableOpacity
-                        style={[styles.modalButton, styles.cancelButton]}
-                        onPress={() => setIsAddingNewAddress(false)}
+                        style={styles.addNewAddressButton}
+                        onPress={() => setIsAddingNewAddress(true)}
                       >
-                        <Text style={styles.cancelButtonText}>Back</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.saveButton]}
-                        onPress={() => saveNewAddress(false)}
-                      >
-                        <Text style={styles.saveButtonText}>Save Address</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.saveDefaultButton]}
-                        onPress={() => saveNewAddress(true)}
-                      >
-                        <Text style={styles.saveDefaultButtonText}>Save as Default</Text>
+                        <MaterialIcons name="add" size={20} color="#fff" />
+                        <Text style={styles.addNewAddressButtonText}>Add New Address</Text>
                       </TouchableOpacity>
                     </View>
-                  </ScrollView>
-                ) : (
-                  <>
-                    <FlatList
-                      data={shippingAddresses}
-                      renderItem={renderAddressItem}
-                      keyExtractor={(item) => item.id}
-                      style={styles.modalAddressList}
-                    />
-                    <TouchableOpacity
-                      style={styles.addNewAddressButton}
-                      onPress={() => setIsAddingNewAddress(true)}
-                    >
-                      <MaterialIcons name="add" size={20} color="#fff" />
-                      <Text style={styles.addNewAddressButtonText}>Add New Address</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.closeModalButton}
-                      onPress={() => setShowAddressModal(false)}
-                    >
-                      <Text style={styles.closeModalButtonText}>Close</Text>
-                    </TouchableOpacity>
-                  </>
+                  </View>
                 )}
               </View>
             </View>
@@ -809,7 +986,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   addressesList: {
-    maxHeight: 200,
+    marginBottom: 10,
   },
   addressItem: {
     backgroundColor: '#f9f9f9',
@@ -890,70 +1067,155 @@ const styles = StyleSheet.create({
     fontFamily: 'inter-medium',
     color: '#fff'
   },
-  // Modal Styles
+  // Modal Styles - FIXED FOR iOS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   modalTitle: {
     fontSize: 20,
     fontFamily: 'inter-bold',
-    marginBottom: 15,
+    color: '#333',
+  },
+  modalCloseButton: {
+    padding: 5,
+  },
+  modalBody: {
+    flex: 1,
+  },
+  selectAddressContainer: {
+    flex: 1,
+  },
+  addressFormScroll: {
+    flex: 1,
+  },
+  addressFormContent: {
+    padding: 20,
+    paddingBottom: 30,
+  },
+  addressListScroll: {
+    flex: 1,
+  },
+  addressListContent: {
+    padding: 20,
+    paddingBottom: 80, // Space for the button
+  },
+  addressItemWrapper: {
+    marginBottom: 10,
+  },
+  formField: {
+    marginBottom: 20,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  formFieldHalf: {
+    flex: 1,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontFamily: 'inter-medium',
+    color: '#333',
+    marginBottom: 8,
+  },
+  formInput: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#eee',
+    fontFamily: 'inter-regular',
+  },
+  inputError: {
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFF5F5',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#D32F2F',
+    fontFamily: 'inter-regular',
+    marginTop: 5,
+  },
+  emptyAddressContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyAddressText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'inter-regular',
     textAlign: 'center',
   },
-  addressForm: {
-    maxHeight: 400,
+  emptyAddressSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+    fontFamily: 'inter-regular',
+    textAlign: 'center',
   },
-  modalAddressList: {
-    maxHeight: 300,
+  addButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   addNewAddressButton: {
     flexDirection: 'row',
     backgroundColor: '#f1b811',
-    padding: 12,
+    padding: 16,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
   },
   addNewAddressButtonText: {
     color: '#fff',
     fontFamily: 'inter-bold',
-    marginLeft: 5,
-  },
-  closeModalButton: {
-    padding: 12,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  closeModalButtonText: {
-    color: '#666',
-    fontFamily: 'inter-medium',
+    marginLeft: 8,
+    fontSize: 16,
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 15,
     gap: 10,
+    marginTop: 10,
   },
   modalButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    padding: 15,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#f0f0f0',
   },
   saveButton: {
     backgroundColor: '#666',
@@ -964,14 +1226,17 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#333',
     fontFamily: 'inter-bold',
+    fontSize: 16,
   },
   saveButtonText: {
     color: '#fff',
     fontFamily: 'inter-bold',
+    fontSize: 16,
   },
   saveDefaultButtonText: {
     color: '#fff',
     fontFamily: 'inter-bold',
+    fontSize: 16,
   },
   loadingAddresses: {
     marginVertical: 10,

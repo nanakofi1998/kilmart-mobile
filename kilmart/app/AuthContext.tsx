@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Make API call to refresh token
-      const response = await apiClient.post('/auth/refresh/', {
+      const response = await apiClient.post('api/auth/refresh/', {
         refresh: refreshToken,
       });
 
