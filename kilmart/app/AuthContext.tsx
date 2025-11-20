@@ -7,8 +7,10 @@ interface AuthContextType {
   user: any;
   isLoading: boolean;
   isRefreshing: boolean;
-  login: (accessToken: string, refreshToken: string, userData: any, mustChangePassword?: boolean) => Promise<void>;
+  isGuest: boolean;
+  login: (accessToken: string, userData: any, mustChangePassword?: boolean, expiresIn?: number) => Promise<void>;
   logout: (silent?: boolean) => Promise<void>;
+  loginAsGuest: () => Promise<void>;
   updateUser: (userData: any) => void;
   refreshAccessToken: () => Promise<boolean>;
 }
@@ -26,12 +28,14 @@ const TOKEN_KEYS = {
   IS_VERIFIED: 'is_verified',
   MUST_CHANGE_PASSWORD: 'must_change_password',
   TOKEN_EXPIRY: 'token_expiry',
+  IS_GUEST: 'is_guest',
 } as const;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const refreshTimeoutRef = useRef<number | undefined>(undefined);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
@@ -54,7 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       appStateRef.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // App came to foreground, check if token needs refresh
       checkTokenValidity();
     }
     appStateRef.current = nextAppState;
@@ -62,22 +65,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuthState = async () => {
     try {
-      const [accessToken, refreshToken, tokenExpiry] = await Promise.all([
+      setIsLoading(true);
+      const [accessToken, refreshToken, tokenExpiry, isGuestMode] = await Promise.all([
         SecureStore.getItemAsync(TOKEN_KEYS.ACCESS_TOKEN),
         SecureStore.getItemAsync(TOKEN_KEYS.REFRESH_TOKEN),
         SecureStore.getItemAsync(TOKEN_KEYS.TOKEN_EXPIRY),
+        SecureStore.getItemAsync(TOKEN_KEYS.IS_GUEST),
       ]);
 
-      if (accessToken && refreshToken) {
+      // Check if user is in guest mode
+      if (isGuestMode === 'true') {
+        setIsGuest(true);
+        setUser({
+          id: 'guest',
+          email: '',
+          full_name: 'Guest User',
+          phone_number: '',
+          is_verified: false,
+          must_change_password: false,
+          access_token: null,
+          is_guest: true,
+        });
+        return;
+      }
+
+      if (accessToken) {
         const isTokenExpired = isTokenExpiring(tokenExpiry);
-        
-        if (isTokenExpired) {
-          // Token is expired or expiring soon, try to refresh
+
+        if (isTokenExpired && refreshToken) {
+          // Only try to refresh if we have a refresh token
           const refreshSuccess = await refreshAccessToken();
           if (!refreshSuccess) {
-            await logout(true); // Silent logout
+            await logout(true);
             return;
           }
+        } else if (isTokenExpired && !refreshToken) {
+          // Token expired but no refresh token available - logout
+          console.log('Token expired but no refresh token available');
+          await logout(true);
+          return;
         } else {
           // Token is still valid, load user data
           await loadUserData();
@@ -85,12 +111,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           scheduleTokenRefresh(tokenExpiry);
         }
       } else {
-        // No tokens found, ensure clean state
-        await logout(true);
+        // No tokens found, set to guest mode by default
+        await loginAsGuest();
       }
     } catch (error) {
       console.error('Error checking auth state:', error);
-      await logout(true);
+      await loginAsGuest();
     } finally {
       setIsLoading(false);
     }
@@ -106,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isVerified,
         mustChangePassword,
         accessToken,
+        isGuestMode,
       ] = await Promise.all([
         SecureStore.getItemAsync(TOKEN_KEYS.USER_ID),
         SecureStore.getItemAsync(TOKEN_KEYS.USER_EMAIL),
@@ -114,7 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.getItemAsync(TOKEN_KEYS.IS_VERIFIED),
         SecureStore.getItemAsync(TOKEN_KEYS.MUST_CHANGE_PASSWORD),
         SecureStore.getItemAsync(TOKEN_KEYS.ACCESS_TOKEN),
+        SecureStore.getItemAsync(TOKEN_KEYS.IS_GUEST),
       ]);
+
+      setIsGuest(isGuestMode === 'true');
 
       if (userId && accessToken) {
         setUser({
@@ -125,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_verified: isVerified === 'true',
           must_change_password: mustChangePassword === 'true',
           access_token: accessToken,
+          is_guest: isGuestMode === 'true',
         });
       }
     } catch (error) {
@@ -135,21 +166,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isTokenExpiring = (tokenExpiry: string | null): boolean => {
     if (!tokenExpiry) return true;
-    
+
     const expiryTime = parseInt(tokenExpiry, 10);
     const currentTime = Date.now();
     const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
-    
+
     return currentTime >= (expiryTime - bufferTime);
   };
 
   const calculateTokenExpiry = (expiresIn: number = 3600): number => {
-    // Default to 1 hour if not provided
     return Date.now() + (expiresIn * 1000);
   };
 
   const scheduleTokenRefresh = (tokenExpiry: string | null) => {
-    if (!tokenExpiry) return;
+    if (!tokenExpiry || isGuest) return;
 
     const expiryTime = parseInt(tokenExpiry, 10);
     const currentTime = Date.now();
@@ -176,37 +206,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // SINGLE refreshAccessToken function (remove the duplicate)
   const refreshAccessToken = async (): Promise<boolean> => {
+    if (isGuest) return false;
+
     try {
       setIsRefreshing(true);
-      const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH_TOKEN);
       
-      if (!refreshToken) {
-        console.log('No refresh token available');
+      // First check if we have a refresh token
+      const existingRefreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH_TOKEN);
+      const currentAccessToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS_TOKEN);
+      
+      if (!currentAccessToken) {
+        console.log('No access token available for refresh');
         return false;
       }
 
-      // Make API call to refresh token
-      const response = await apiClient.post('api/auth/refresh/', {
-        refresh: refreshToken,
-      });
+      // TODO: Replace with your actual endpoints
+      let refreshEndpoint = 'YOUR_EXTERNAL_REFRESH_ENDPOINT';
+      let requestData = {};
 
-      const { access, refresh: newRefreshToken, expires_in } = response.data;
+      if (existingRefreshToken) {
+        // If we have a refresh token, use it
+        refreshEndpoint = 'YOUR_REFRESH_TOKEN_ENDPOINT';
+        requestData = { refresh: existingRefreshToken };
+      } else {
+        // If no refresh token, use the access token to get a new one
+        refreshEndpoint = 'YOUR_ACCESS_TOKEN_REFRESH_ENDPOINT';
+        requestData = { access_token: currentAccessToken };
+      }
+
+      // Make API call to refresh endpoint
+      const response = await apiClient.post(refreshEndpoint, requestData);
+
+      const { access_token, refresh_token, expires_in } = response.data;
+
+      if (!access_token) {
+        console.log('No access token received from refresh endpoint');
+        return false;
+      }
 
       // Calculate new expiry time
       const newExpiry = calculateTokenExpiry(expires_in);
 
-      // Store new tokens
-      await Promise.all([
-        SecureStore.setItemAsync(TOKEN_KEYS.ACCESS_TOKEN, access),
+      // Store the new access token and update expiry
+      const storagePromises = [
+        SecureStore.setItemAsync(TOKEN_KEYS.ACCESS_TOKEN, access_token),
         SecureStore.setItemAsync(TOKEN_KEYS.TOKEN_EXPIRY, newExpiry.toString()),
-        ...(newRefreshToken ? [SecureStore.setItemAsync(TOKEN_KEYS.REFRESH_TOKEN, newRefreshToken)] : []),
-      ]);
+      ];
+
+      // Store refresh token if provided (this should happen on first refresh)
+      if (refresh_token) {
+        storagePromises.push(SecureStore.setItemAsync(TOKEN_KEYS.REFRESH_TOKEN, refresh_token));
+      }
+
+      await Promise.all(storagePromises);
 
       // Update user state with new access token
       setUser((prev: any) => ({
         ...prev,
-        access_token: access,
+        access_token: access_token,
       }));
 
       // Schedule next refresh
@@ -216,13 +275,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true;
     } catch (error: any) {
       console.error('Token refresh failed:', error);
-      
-      // If refresh token is invalid, logout user
+
+      // If refresh fails, logout user
       if (error.response?.status === 401) {
-        console.log('Refresh token invalid, logging out');
+        console.log('Refresh failed, logging out');
         await logout(true);
       }
-      
+
       return false;
     } finally {
       setIsRefreshing(false);
@@ -230,6 +289,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const checkTokenValidity = async () => {
+    if (isGuest) return;
+
     try {
       const tokenExpiry = await SecureStore.getItemAsync(TOKEN_KEYS.TOKEN_EXPIRY);
       if (tokenExpiry && isTokenExpiring(tokenExpiry)) {
@@ -240,20 +301,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // SINGLE login function (remove the duplicate)
   const login = async (
-    accessToken: string, 
-    refreshToken: string, 
-    userData: any, 
+    accessToken: string,
+    userData: any,
     mustChangePassword: boolean = false,
     expiresIn: number = 3600
   ) => {
     try {
+      // Calculate expiry time
       const tokenExpiry = calculateTokenExpiry(expiresIn);
+      console.log('Token expiry calculated:', new Date(tokenExpiry).toISOString());
 
-      // Store tokens and user data
+      // Store only access token initially (no refresh token yet)
       await Promise.all([
         SecureStore.setItemAsync(TOKEN_KEYS.ACCESS_TOKEN, accessToken),
-        SecureStore.setItemAsync(TOKEN_KEYS.REFRESH_TOKEN, refreshToken),
         SecureStore.setItemAsync(TOKEN_KEYS.TOKEN_EXPIRY, tokenExpiry.toString()),
         SecureStore.setItemAsync(TOKEN_KEYS.USER_ID, userData?.id?.toString() || ''),
         SecureStore.setItemAsync(TOKEN_KEYS.USER_EMAIL, userData?.email || ''),
@@ -261,6 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.setItemAsync(TOKEN_KEYS.USER_PHONE, userData?.phone_number || ''),
         SecureStore.setItemAsync(TOKEN_KEYS.IS_VERIFIED, userData?.is_verified?.toString() || 'false'),
         SecureStore.setItemAsync(TOKEN_KEYS.MUST_CHANGE_PASSWORD, mustChangePassword.toString()),
+        SecureStore.setItemAsync(TOKEN_KEYS.IS_GUEST, 'false'),
       ]);
 
       // Update user state
@@ -272,12 +335,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         is_verified: Boolean(userData?.is_verified),
         must_change_password: mustChangePassword,
         access_token: accessToken,
+        is_guest: false,
       };
 
       setUser(userState);
+      setIsGuest(false);
 
       // Schedule token refresh
       scheduleTokenRefresh(tokenExpiry.toString());
+
+      console.log('Login successful, token expiry scheduled');
 
     } catch (error) {
       console.error('Error during login:', error);
@@ -285,24 +352,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginAsGuest = async () => {
+    try {
+      await logout(true);
+      await SecureStore.setItemAsync(TOKEN_KEYS.IS_GUEST, 'true');
+
+      const guestUser = {
+        id: 'guest',
+        email: '',
+        full_name: 'Guest User',
+        phone_number: '',
+        is_verified: false,
+        must_change_password: false,
+        access_token: null,
+        is_guest: true,
+      };
+
+      setUser(guestUser);
+      setIsGuest(true);
+      console.log('User logged in as guest');
+    } catch (error) {
+      console.error('Error during guest login:', error);
+      throw error;
+    }
+  };
+
   const logout = async (silent: boolean = false) => {
     try {
-      // Clear all stored data
-      const deletePromises = Object.values(TOKEN_KEYS).map(key => 
+      const deletePromises = Object.values(TOKEN_KEYS).map(key =>
         SecureStore.deleteItemAsync(key)
       );
-      
+
       await Promise.all(deletePromises);
 
-      // Clear any scheduled refresh
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
 
       setUser(null);
+      setIsGuest(false);
 
       if (!silent) {
-        // Show logout message (optional)
         console.log('User logged out successfully');
       }
     } catch (error) {
@@ -316,8 +406,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUser = (userData: any) => {
     setUser((prev: any) => {
       const updatedUser = { ...prev, ...userData };
-      
-      // Update stored user data as well
+
       if (userData.email) {
         SecureStore.setItemAsync(TOKEN_KEYS.USER_EMAIL, userData.email);
       }
@@ -330,7 +419,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (userData.is_verified !== undefined) {
         SecureStore.setItemAsync(TOKEN_KEYS.IS_VERIFIED, userData.is_verified.toString());
       }
-      
+
       return updatedUser;
     });
   };
@@ -339,6 +428,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const requestInterceptor = apiClient.interceptors.request.use(
       async (config) => {
+        if (isGuest) return config;
+
         const token = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS_TOKEN);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -353,6 +444,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const responseInterceptor = apiClient.interceptors.response.use(
       (response) => response,
       async (error) => {
+        if (isGuest) return Promise.reject(error);
+
         const originalRequest = error.config;
 
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -360,7 +453,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           const refreshSuccess = await refreshAccessToken();
           if (refreshSuccess) {
-            // Retry the original request with new token
             const newToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS_TOKEN);
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return apiClient(originalRequest);
@@ -377,17 +469,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       apiClient.interceptors.request.eject(requestInterceptor);
       apiClient.interceptors.response.eject(responseInterceptor);
     };
-  }, []);
+  }, [isGuest]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
       isRefreshing,
-      login, 
-      logout, 
+      isGuest,
+      login,
+      logout,
+      loginAsGuest,
       updateUser,
-      refreshAccessToken 
+      refreshAccessToken
     }}>
       {children}
     </AuthContext.Provider>

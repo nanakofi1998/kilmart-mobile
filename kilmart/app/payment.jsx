@@ -16,8 +16,9 @@ import {
   KeyboardAvoidingView
 } from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Feather from '@expo/vector-icons/Feather';
+import { Entypo, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -419,7 +420,7 @@ export function Payment() {
           {item.is_default ? 'Default Address' : 'Saved Address'}
         </Text>
         {item.is_default && (
-          <MaterialIcons name="star" size={16} color="#FFD700" />
+          <Entypo name="star" size={16} color="#FFD700" />
         )}
       </View>
       <Text style={styles.addressText}>{item.address_line_1}</Text>

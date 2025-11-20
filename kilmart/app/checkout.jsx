@@ -11,7 +11,7 @@ import {
   Platform,
   StatusBar 
 } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCart } from '../context/CartContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,7 +42,7 @@ export default function Checkout() {
       {/* Header with Back Button */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <MaterialIcons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Checkout</Text>
         <View style={styles.headerPlaceholder} />

@@ -211,11 +211,11 @@ const ContactUs = () => {
           <View style={styles.contactMethods}>
             <View style={styles.contactMethod}>
               <Ionicons name="call" size={20} color="#f1b811" />
-              <Text style={styles.contactText}>+233 53 082 6193</Text>
+              <Text style={styles.contactText}>+233 24 892 6993</Text>
             </View>
             <View style={styles.contactMethod}>
               <Ionicons name="mail" size={20} color="#f1b811" />
-              <Text style={styles.contactText}>support@kwirkmart.expertech.dev</Text>
+              <Text style={styles.contactText}>kwikmart18@gmail.com</Text>
             </View>
             <View style={styles.contactMethod}>
               <Ionicons name="time" size={20} color="#f1b811" />

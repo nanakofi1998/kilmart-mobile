@@ -85,9 +85,11 @@ export default function Index() {
     if (user) {
       if (user.must_change_password) {
         router.replace('/forgot-pwd');
-      } else if (!user.is_verified) {
-        router.replace('/verifyotp');
-      } else {
+      } 
+      // else if (!user.is_verified) {
+      //   router.replace('/verifyotp');
+      // } 
+      else {
         router.replace('/home');
       }
     } else {

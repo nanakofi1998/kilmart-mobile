@@ -17,15 +17,16 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <SafeAreaProvider>
+
+    <SafeAreaProvider>
+      <AuthProvider>
         <CartProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
           </Stack>
         </CartProvider>
-      </SafeAreaProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </SafeAreaProvider >
   );
 }

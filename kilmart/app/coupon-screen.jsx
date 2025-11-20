@@ -1,46 +1,45 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, Dimensions, Image } from 'react-native';
-import React from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, Dimensions, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import apiClient from '../utils/apiClient';
+import { useAuth } from './AuthContext';
 
 const { width } = Dimensions.get('window');
 
 const CouponScreen = () => {
   const router = useRouter();
+  const { user } = useAuth();
   
-  // Sample coupon data
-  const coupons = [
-    {
-      id: '1',
-      code: 'WELCOME25',
-      discount: '25%',
-      discountText: 'DISCOUNT',
-      title: 'WELCOME OFFER',
-      description: 'Get 25% off on your first order above $50',
-      validUntil: 'Dec 31, 2024',
-      couponNumber: 'KWIK2024001',
-    },
-    {
-      id: '2',
-      code: 'FREESHIP',
-      discount: 'FREE',
-      discountText: 'SHIPPING',
-      title: 'FREE DELIVERY',
-      description: 'Free shipping on all orders above $30',
-      validUntil: 'Nov 30, 2024',
-      couponNumber: 'KWIK2024002',
-    },
-    {
-      id: '3',
-      code: 'SAVE15',
-      discount: '15%',
-      discountText: 'DISCOUNT',
-      title: 'WEEKEND SPECIAL',
-      description: '15% off on all weekend orders',
-      validUntil: 'Oct 15, 2024',
-      couponNumber: 'KWIK2024003',
-    },
-  ];
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch coupons from API
+  const fetchCoupons = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await apiClient.get('api/v1/coupons/my-gifts/');
+      
+      if (response.data && Array.isArray(response.data)) {
+        setCoupons(response.data);
+      } else {
+        setCoupons([]);
+      }
+    } catch (err) {
+      console.error('Error fetching coupons:', err);
+      setError('Failed to load coupons. Please try again.');
+      setCoupons([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCoupons();
+  }, []);
 
   const handleCopyCode = (code) => {
     Alert.alert('Copied!', `Coupon code ${code} copied to clipboard`);
@@ -52,6 +51,37 @@ const CouponScreen = () => {
 
   const handleBack = () => {
     router.back();
+  };
+
+  const handleRetry = () => {
+    fetchCoupons();
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No expiry';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  // Get discount text based on coupon type
+  const getDiscountText = (coupon) => {
+    if (coupon.discount_type === 'percentage') {
+      return `${coupon.discount_value}% DISCOUNT`;
+    } else if (coupon.discount_type === 'fixed') {
+      return `GH₵${coupon.discount_value} OFF`;
+    } else {
+      return 'DISCOUNT';
+    }
   };
 
   const HorizontalCouponCard = ({ coupon }) => (
@@ -68,8 +98,10 @@ const CouponScreen = () => {
           </View>
           
           <View style={styles.discountSection}>
-            <Text style={styles.discountAmount}>{coupon.discount}</Text>
-            <Text style={styles.discountType}>{coupon.discountText}</Text>
+            <Text style={styles.discountAmount}>
+              {coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `GH₵${coupon.discount_value}`}
+            </Text>
+            <Text style={styles.discountType}>{getDiscountText(coupon)}</Text>
           </View>
 
           <View style={styles.logoContainer}>
@@ -83,16 +115,18 @@ const CouponScreen = () => {
         <View style={styles.rightSection}>
           <View style={styles.headerRight}>
             <Text style={styles.couponTitle}>GIFT COUPON</Text>
-            <Text style={styles.couponSubtitle}>{coupon.title}</Text>
+            <Text style={styles.couponSubtitle}>{coupon.name || 'Special Offer'}</Text>
           </View>
 
           <View style={styles.descriptionSection}>
-            <Text style={styles.descriptionText}>{coupon.description}</Text>
+            <Text style={styles.descriptionText}>
+              {coupon.description || `Use code ${coupon.code} for amazing savings`}
+            </Text>
           </View>
 
           <View style={styles.detailsBottom}>
             <View style={styles.couponNumber}>
-              <Text style={styles.couponNumberText}>{coupon.couponNumber}</Text>
+              <Text style={styles.couponNumberText}>{coupon.code}</Text>
             </View>
             
             <View style={styles.codeSection}>
@@ -108,21 +142,139 @@ const CouponScreen = () => {
 
             <View style={styles.validitySection}>
               <Text style={styles.validityLabel}>VALID UNTIL</Text>
-              <Text style={styles.validityDate}>{coupon.validUntil}</Text>
+              <Text style={styles.validityDate}>
+                {coupon.valid_until ? formatDate(coupon.valid_until) : 'No expiry'}
+              </Text>
             </View>
+
+            {coupon.minimum_order_amount && (
+              <View style={styles.minOrderSection}>
+                <Text style={styles.minOrderLabel}>MIN. ORDER</Text>
+                <Text style={styles.minOrderAmount}>GH₵{coupon.minimum_order_amount}</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
 
       {/* Use Coupon Button */}
       <TouchableOpacity 
-        style={styles.useButton}
+        style={[
+          styles.useButton,
+          coupon.is_used && styles.usedButton
+        ]}
         onPress={() => handleUseCoupon(coupon)}
+        disabled={coupon.is_used}
       >
-        <Text style={styles.useButtonText}>USE THIS COUPON</Text>
+        <Text style={[
+          styles.useButtonText,
+          coupon.is_used && styles.usedButtonText
+        ]}>
+          {coupon.is_used ? 'ALREADY USED' : 'USE THIS COUPON'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Gift Coupons</Text>
+            <Text style={styles.headerSubtitle}>
+              Loading your coupons...
+            </Text>
+          </View>
+
+          <View style={styles.headerRightIcon}>
+            <Ionicons name="gift" size={28} color="#fff" />
+          </View>
+        </View>
+
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#f1b811" />
+          <Text style={styles.loadingText}>Loading your coupons...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Gift Coupons</Text>
+            <Text style={styles.headerSubtitle}>
+              Couldn't load coupons
+            </Text>
+          </View>
+
+          <View style={styles.headerRightIcon}>
+            <Ionicons name="gift" size={28} color="#fff" />
+          </View>
+        </View>
+
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={48} color="#ff6b6b" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Empty state
+  if (coupons.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Gift Coupons</Text>
+            <Text style={styles.headerSubtitle}>
+              No coupons available
+            </Text>
+          </View>
+
+          <View style={styles.headerRightIcon}>
+            <Ionicons name="gift" size={28} color="#fff" />
+          </View>
+        </View>
+
+        <View style={styles.emptyContainer}>
+          <Ionicons name="gift-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyTitle}>No Coupons Yet</Text>
+          <Text style={styles.emptyText}>
+            You don't have any gift coupons at the moment.{'\n'}
+            Check back later for special offers!
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -137,7 +289,7 @@ const CouponScreen = () => {
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Gift Coupons</Text>
           <Text style={styles.headerSubtitle}>
-            Exclusive discounts for you
+            {coupons.length} coupon{coupons.length !== 1 ? 's' : ''} available
           </Text>
         </View>
 
@@ -362,6 +514,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
   validityLabel: {
     fontSize: 10,
@@ -374,16 +527,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  minOrderSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  minOrderLabel: {
+    fontSize: 10,
+    color: '#999',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  minOrderAmount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
   useButton: {
     backgroundColor: '#000000ff',
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  usedButton: {
+    backgroundColor: '#ccc',
   },
   useButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  usedButtonText: {
+    color: '#666',
   },
   infoSection: {
     flexDirection: 'row',
@@ -401,6 +576,61 @@ const styles = StyleSheet.create({
     color: '#666',
     flex: 1,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#f1b811',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
 
