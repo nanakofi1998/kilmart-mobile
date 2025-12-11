@@ -383,8 +383,10 @@ export default function LoginScreen() {
               lineHeight: 16,
             }}>
               By continuing, you agree to our{' '}
-              <Text style={{ color: '#1a1a1a', fontFamily: 'inter-bold' }}>Terms of Service</Text> and{' '}
-              <Text style={{ color: '#1a1a1a', fontFamily: 'inter-bold' }}>Privacy Policy</Text>
+              <TouchableOpacity onPress={ () => Linking.openURL('https://kwirkmart.expertech.dev/privacy-policy/')}>
+                <Text style={{ color: '#1a1a1a', fontFamily: 'inter-bold' }}>Terms of Service</Text> and{' '}
+                <Text style={{ color: '#1a1a1a', fontFamily: 'inter-bold' }}>Privacy Policy</Text>
+              </TouchableOpacity>
             </Text>
           </View>
         </View>
