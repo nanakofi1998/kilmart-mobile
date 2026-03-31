@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ScrollView,
   Modal, TextInput, ActivityIndicator, Dimensions, Alert, Platform,
-  StatusBar, PanResponder
+  StatusBar, PanResponder, findNodeHandle
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
@@ -41,6 +41,7 @@ export default function CategoryScreen() {
 
   const mainScrollViewRef = useRef(null);
   const subScrollViewRef = useRef(null);
+  const subScrollViewContainerRef = useRef(null);
   const tabRefs = useRef({});
   const panResponderRef = useRef(null);
   const isInitializing = useRef(true);
@@ -48,23 +49,83 @@ export default function CategoryScreen() {
   
   // Use ref to track current category for swipe gestures
   const currentCategoryRef = useRef(null);
+  // Track if we're touching a scrollable component
+  const isTouchingSubCategoryScroll = useRef(false);
 
   // Update the ref whenever selectedMainTab changes
   useEffect(() => {
     currentCategoryRef.current = state.selectedMainTab;
-    console.log('🔄 Ref updated:', currentCategoryRef.current, 'Type:', typeof currentCategoryRef.current);
   }, [state.selectedMainTab]);
 
   // Create pan responder for swipe gestures
   useEffect(() => {
     panResponderRef.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Get the native event target
+        const target = evt.nativeEvent.target;
+        
+        // Check if the touch is within the subcategory scroll view
+        // We can check the parent hierarchy by looking at the element's type
+        let currentTarget = evt.currentTarget;
+        let isInSubScrollView = false;
+        
+        // Find the subcategory scroll view node handle
+        if (subScrollViewRef.current) {
+          const subScrollViewNode = findNodeHandle(subScrollViewRef.current);
+          let nodeHandle = findNodeHandle(target);
+          
+          // Traverse up the parent chain to check if the touch is inside subcategory scroll view
+          while (nodeHandle && nodeHandle !== subScrollViewNode) {
+            // Check if this node is a child of subcategory scroll view
+            if (nodeHandle === subScrollViewNode) {
+              isInSubScrollView = true;
+              break;
+            }
+            // In React Native, we can't easily traverse parent hierarchy, so we'll use an alternative approach
+            break;
+          }
+        }
+        
+        // Alternative: Use the view's nativeID or testID if you set them
+        // For now, we'll use a different approach - check the location
+        if (subScrollViewRef.current) {
+          // Get the position of the subcategory scroll view
+          subScrollViewRef.current.measure((x, y, width, height, pageX, pageY) => {
+            const touchY = evt.nativeEvent.pageY;
+            const touchX = evt.nativeEvent.pageX;
+            
+            // Check if touch coordinates are within the subcategory scroll view bounds
+            const isWithinBounds = touchX >= pageX && touchX <= pageX + width &&
+                                   touchY >= pageY && touchY <= pageY + height;
+            
+            isTouchingSubCategoryScroll.current = isWithinBounds;
+            
+            if (isWithinBounds) {
+              console.log('👆 Touch in subcategory area - blocking category swipe');
+            }
+          });
+          
+          // Since measure is async, we need to return false initially to let the gesture start
+          // We'll manage this in the release handler
+          return false;
+        }
+        
+        return true;
+      },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only handle horizontal swipes
         return Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderRelease: (evt, gestureState) => {
+        // If we're touching the subcategory scroll view, don't change category
+        if (isTouchingSubCategoryScroll.current) {
+          console.log('🚫 Swipe ignored - touching subcategory scroll view');
+          isTouchingSubCategoryScroll.current = false; // Reset
+          return;
+        }
+        
         const { dx } = gestureState;
-
+        
         if (dx > SWIPE_THRESHOLD) {
           handleSwipe('right');
         } else if (dx < -SWIPE_THRESHOLD) {
@@ -79,36 +140,21 @@ export default function CategoryScreen() {
 
     const currentCategoryId = currentCategoryRef.current;
     
-    // Convert both to numbers for comparison
     const currentMainIndex = state.categories.findIndex(cat => 
       Number(cat.id) === Number(currentCategoryId)
     );
     
-    console.log('🔄 Swipe detected:', direction, 'Current ID:', currentCategoryId, 'Type:', typeof currentCategoryId, 'Current index:', currentMainIndex);
-    console.log('📋 Categories:', state.categories.map(cat => `${cat.id}(${typeof cat.id}): ${cat.name}`));
-    
-    if (currentMainIndex === -1) {
-      console.log('❌ Current category not found. Looking for:', currentCategoryId, 'Available:', state.categories.map(c => c.id));
-      return;
-    }
+    if (currentMainIndex === -1) return;
     
     if (direction === 'left') {
-      // Swipe left - go to next category
       if (currentMainIndex < state.categories.length - 1) {
         const nextMain = state.categories[currentMainIndex + 1];
-        console.log('🔄 Swipe left: Moving to next category', nextMain.name, 'ID:', nextMain.id, 'Index:', currentMainIndex + 1);
         handleMainTabChange(nextMain.id);
-      } else {
-        console.log('ℹ️ Already at last category, cannot swipe left');
       }
     } else {
-      // Swipe right - go to previous category
       if (currentMainIndex > 0) {
         const prevMain = state.categories[currentMainIndex - 1];
-        console.log('🔄 Swipe right: Moving to previous category', prevMain.name, 'ID:', prevMain.id, 'Index:', currentMainIndex - 1);
         handleMainTabChange(prevMain.id);
-      } else {
-        console.log('ℹ️ Already at first category, cannot swipe right');
       }
     }
   };
@@ -131,19 +177,16 @@ export default function CategoryScreen() {
       let data = response.data;
 
       if (stateKey === 'categories') {
-        // Sort categories by ID to ensure consistent order and ensure IDs are numbers
         data = data.sort((a, b) => Number(a.id) - Number(b.id)).map(cat => ({
           ...cat,
-          id: Number(cat.id) // Ensure ID is a number
+          id: Number(cat.id)
         }));
-        console.log('📊 Categories loaded and sorted:', data.map(cat => `${cat.id}(${typeof cat.id}): ${cat.name}`));
       }
 
       if (stateKey === 'items') {
         data = data.map(item => {
           let cleanPrice = Number(item.price);
           if (isNaN(cleanPrice) || cleanPrice === null || cleanPrice === undefined) {
-            console.warn(`⚠️ Product "${item.name}" has invalid price value:`, item.price);
             cleanPrice = 0;
           }
           return {
@@ -172,7 +215,6 @@ export default function CategoryScreen() {
     const tabRef = tabRefs.current[tabId];
     
     if (tabRef && scrollViewRef.current) {
-      // Use a small timeout to ensure the ref is measured correctly
       setTimeout(() => {
         tabRef.measureLayout(
           scrollViewRef.current,
@@ -185,14 +227,10 @@ export default function CategoryScreen() {
             }
           },
           () => {
-            console.log('❌ Failed to measure tab layout for:', tabId);
-            // Fallback: scroll to start if measurement fails
             scrollViewRef.current?.scrollTo({ x: 0, animated: true });
           }
         );
       }, 50);
-    } else {
-      console.log('❌ Tab ref or scrollView ref not available for:', tabId);
     }
   }, []);
 
@@ -258,13 +296,10 @@ export default function CategoryScreen() {
 
       let targetCategoryId = null;
 
-      // Priority: URL parameter > First category
       if (id && cats.find(cat => cat.id.toString() === id.toString())) {
-        targetCategoryId = Number(id); // Ensure URL param is converted to number
-        console.log('🔄 Using URL category:', targetCategoryId, 'Type:', typeof targetCategoryId);
+        targetCategoryId = Number(id);
       } else if (cats.length > 0) {
         targetCategoryId = cats[0].id;
-        console.log('🔄 Using first category:', targetCategoryId, 'Type:', typeof targetCategoryId);
       }
 
       if (targetCategoryId) {
@@ -279,11 +314,8 @@ export default function CategoryScreen() {
   }, [id]));
 
   const handleMainTabChange = useCallback(async (categoryId) => {
-    // Ensure categoryId is a number
     const numericCategoryId = Number(categoryId);
-    console.log('📱 Changing main tab to:', numericCategoryId, 'Type:', typeof numericCategoryId, 'from current:', state.selectedMainTab);
     
-    // Update both state and ref
     setState(prev => ({
       ...prev,
       selectedMainTab: numericCategoryId,
@@ -295,28 +327,22 @@ export default function CategoryScreen() {
 
     currentCategoryRef.current = numericCategoryId;
 
-    // Use setTimeout to ensure scroll happens after re-render
     setTimeout(() => {
       scrollToTab(numericCategoryId, mainScrollViewRef);
     }, 100);
 
-    // Load subcategories for the new category
     const subs = await fetchData(`api/categories/${numericCategoryId}/subcategories/`, 'subCategories', 'subCategories');
 
     if (subs.length > 0) {
-      // Always select the first subcategory when switching categories
       const firstSub = subs[0];
-      console.log('🔄 Selecting first subcategory:', firstSub.name, 'ID:', firstSub.id);
       
       setState(prev => ({
         ...prev,
         selectedSubTab: firstSub.id
       }));
 
-      // Load items for the first subcategory
       await fetchData(`api/subcategories/${firstSub.id}/products/`, 'items', 'items');
       
-      // Scroll to the first subcategory after a brief delay
       setTimeout(() => {
         scrollToTab(firstSub.id, subScrollViewRef);
       }, 150);
@@ -328,11 +354,9 @@ export default function CategoryScreen() {
         loading: { ...prev.loading, items: false }
       }));
     }
-  }, [fetchData, scrollToTab, state.selectedMainTab]);
+  }, [fetchData, scrollToTab]);
 
   const handleSubTabChange = useCallback(async (subCategoryId) => {
-    console.log('📱 Changing sub tab to:', subCategoryId);
-    
     if (state.selectedSubTab === subCategoryId) return;
 
     setState(prev => ({
@@ -404,6 +428,22 @@ export default function CategoryScreen() {
     } catch (error) {
       Alert.alert('Error', 'Failed to add item to cart');
       console.error('Add to cart error:', error);
+    }
+  };
+
+  const handleTouchStart = (evt) => {
+    // When touching the subcategory scroll view, prevent the parent pan responder
+    if (subScrollViewRef.current) {
+      subScrollViewRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const touchX = evt.nativeEvent.pageX;
+        const touchY = evt.nativeEvent.pageY;
+        
+        if (touchX >= pageX && touchX <= pageX + width &&
+            touchY >= pageY && touchY <= pageY + height) {
+          // Prevent the gesture from being captured by the parent
+          evt.stopPropagation();
+        }
+      });
     }
   };
 
@@ -492,23 +532,14 @@ export default function CategoryScreen() {
       }}
       {...panResponderRef.current?.panHandlers}
     >
-      {/* Debug info - remove in production */}
-      {/* {__DEV__ && (
-        <View style={styles.debugInfo}>
-          <Text style={styles.debugText}>
-            Current: {state.selectedMainTab}({typeof state.selectedMainTab}) | 
-            Ref: {currentCategoryRef.current}({typeof currentCategoryRef.current})
-          </Text>
-        </View>
-      )} */}
-
-      {/* Tabs */}
+      {/* Tabs Section */}
       <View style={styles.tabContainer}>
         <ScrollView
           horizontal
           ref={mainScrollViewRef}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.mainTabBarContainer}
+          scrollEventThrottle={16}
         >
           {state.categories.map(category => renderTab(category))}
         </ScrollView>
@@ -518,12 +549,14 @@ export default function CategoryScreen() {
           ref={subScrollViewRef}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.subTabBarContainer}
+          scrollEventThrottle={16}
+          onTouchStart={handleTouchStart}
         >
           {state.subCategories.map(subCategory => renderTab(subCategory, false))}
         </ScrollView>
       </View>
 
-      {/* Products */}
+      {/* Products Section */}
       {state.loading.items ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#333" />
@@ -615,19 +648,6 @@ export default function CategoryScreen() {
 
 
 const styles = StyleSheet.create({
-  debugInfo: {
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 5,
-    position: 'absolute',
-    top: 40,
-    left: 10,
-    zIndex: 1000,
-    borderRadius: 5,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 10,
-  },
   tabContainer: {
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
